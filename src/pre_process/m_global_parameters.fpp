@@ -97,8 +97,10 @@ module m_global_parameters
     logical :: parallel_io !< Format of the data files
     integer :: precision !< Precision of output files
 
-    logical :: vel_profile !< Set hypertangent streamwise velocity profile
+    logical :: vel_profile !< Set hyperbolic tangent streamwise velocity profile
     logical :: instability_wave !< Superimpose instability waves to surrounding fluid flow
+
+    real(kind(0d0)) :: pi_fac !< Factor for artificial pi_inf
 
     ! Perturb density of surrounding air so as to break symmetry of grid
     logical :: perturb_flow
@@ -254,6 +256,8 @@ contains
         perturb_sph = .false.
         perturb_sph_fluid = dflt_int
         fluid_rho = dflt_real
+
+        pi_fac = 1d0
 
         ! Initial condition parameters
         num_patches = dflt_int
@@ -451,7 +455,7 @@ contains
 
                 if (nb == 1) then
                     weight(:) = 1d0
-                    R0(:) = 1d0
+                    R0(:) = R0ref       ! Modified line
                     V0(:) = 1d0
                 else if (nb > 1) then
                     if (R0_type == 1) then
@@ -675,7 +679,7 @@ contains
         D_m = 0.242d-4
         uu = DSQRT(pl0/rhol0)
 
-        omega_ref = 3.d0*k_poly*Ca + 2.d0*(3.d0*k_poly - 1.d0)/Web
+        omega_ref = 3.d0*k_poly*Ca + 2.d0*(3.d0*k_poly - 1.d0)/Web      ! NOT USED?
 
         ! thermal properties --- 
 
@@ -684,31 +688,31 @@ contains
         R_v = Ru/M_v
         ! phi_vn & phi_nv (phi_nn = phi_vv = 1)
         phi_vn = (1.d0 + DSQRT(mu_v/mu_n)*(M_n/M_v)**(0.25d0))**2 &
-                 /(DSQRT(8.d0)*DSQRT(1.d0 + M_v/M_n))
+                 /(DSQRT(8.d0)*DSQRT(1.d0 + M_v/M_n))                   ! ANDO(2010) EQ (2.22)
         phi_nv = (1.d0 + DSQRT(mu_n/mu_v)*(M_v/M_n)**(0.25d0))**2 &
-                 /(DSQRT(8.d0)*DSQRT(1.d0 + M_n/M_v))
+                 /(DSQRT(8.d0)*DSQRT(1.d0 + M_n/M_v))                   ! ANDO(2010) EQ (2.22)
         ! internal bubble pressure
-        pb0 = pl0 + 2.d0*ss/(R0ref*R0)
+        pb0 = pl0 + 2.d0*ss/(R0ref*R0)                                  ! ANDO(2010) EQ (2.6)
 
         ! mass fraction of vapor
-        chi_vw0 = 1.d0/(1.d0 + R_v/R_n*(pb0/pv - 1.d0))
+        chi_vw0 = 1.d0/(1.d0 + R_v/R_n*(pb0/pv - 1.d0))                 ! ANDO(2010) EQ (2.19)
         ! specific heat for gas/vapor mixture
         cp_m0 = chi_vw0*R_v*gamma_v/(gamma_v - 1.d0) &
-                + (1.d0 - chi_vw0)*R_n*gamma_n/(gamma_n - 1.d0)
+                + (1.d0 - chi_vw0)*R_n*gamma_n/(gamma_n - 1.d0)         ! NOT FOUND? BUT.. STRAITFORWARD
         ! mole fraction of vapor
-        x_vw = M_n*chi_vw0/(M_v + (M_n - M_v)*chi_vw0)
+        x_vw = M_n*chi_vw0/(M_v + (M_n - M_v)*chi_vw0)                  ! ANDO(2010) EQ (2.23)
         ! thermal conductivity for gas/vapor mixture
         k_m0 = x_vw*k_v/(x_vw + (1.d0 - x_vw)*phi_vn) &
-               + (1.d0 - x_vw)*k_n/(x_vw*phi_nv + 1.d0 - x_vw)
+               + (1.d0 - x_vw)*k_n/(x_vw*phi_nv + 1.d0 - x_vw)          ! ANDO(2010) EQ (2.21)
         ! mixture density
-        rho_m0 = pv/(chi_vw0*R_v*temp)
+        rho_m0 = pv/(chi_vw0*R_v*temp)                                  ! ANDO(2010) EQ (2.20)
 
         ! mass of gas/vapor computed using dimensional quantities
-        mass_n0 = 4.d0*(pb0 - pv)*pi/(3.d0*R_n*temp*rhol0)*R0**3
-        mass_v0 = 4.d0*pv*pi/(3.d0*R_v*temp*rhol0)*R0**3
+        mass_n0 = 4.d0*(pb0 - pv)*pi/(3.d0*R_n*temp*rhol0)*R0**3        ! NOT FOUND (MASS = VOLUME * PARTIAL DENSITY, NONDIM WITH R_REF AND RHO_L0)
+        mass_v0 = 4.d0*pv*pi/(3.d0*R_v*temp*rhol0)*R0**3                ! NOT FOUND (MASS = VOLUME * PARTIAL DENSITY, NONDIM WITH R_REF AND RHO_L0)
         ! Peclet numbers
-        Pe_T = rho_m0*cp_m0*uu*R0ref/k_m0
-        Pe_c = uu*R0ref/D_m
+        Pe_T = rho_m0*cp_m0*uu*R0ref/k_m0                               ! ANDO(2010) P.112 BOTTOM (THERMAL DIFFUSIVITY: ALPHA_T = K/(RHO*CP))
+        Pe_c = uu*R0ref/D_m                                             ! ANDO(2010) P.112 BOTTOM
         ! nondimensional properties
         R_n = rhol0*R_n*temp/pl0
         R_v = rhol0*R_v*temp/pl0
@@ -723,14 +727,14 @@ contains
         ! keeps a constant (cold liquid assumption)
         Tw = 1.d0
         ! natural frequencies
-        omegaN = DSQRT(3.d0*k_poly*Ca + 2.d0*(3.d0*k_poly - 1.d0)/(Web*R0))/R0
+        omegaN = DSQRT(3.d0*k_poly*Ca + 2.d0*(3.d0*k_poly - 1.d0)/(Web*R0))/R0  ! ANDO(2010) EQ (B.2) 
 
         pl0 = 1.d0
         do ir = 1, Nb
             call s_transcoeff(omegaN(ir)*R0(ir), Pe_T(ir)*R0(ir), &
-                              Re_trans_T(ir), Im_trans_T(ir))
+                              Re_trans_T(ir), Im_trans_T(ir))                   ! ANDO(2010) EQ (B.19)
             call s_transcoeff(omegaN(ir)*R0(ir), Pe_c*R0(ir), &
-                              Re_trans_c(ir), Im_trans_c(ir))
+                              Re_trans_c(ir), Im_trans_c(ir))                   ! ANDO(2010) EQ (B.19)
         end do
         Im_trans_T = 0d0
         Im_trans_c = 0d0

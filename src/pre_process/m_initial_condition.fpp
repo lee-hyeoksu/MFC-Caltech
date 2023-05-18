@@ -184,10 +184,6 @@ contains
                 elseif (patch_icpp(i)%geometry == 18) then
                     call s_varcircle(i, patch_id_fp, q_prim_vf)
 
-                    ! TaylorGreen vortex patch
-                elseif (patch_icpp(i)%geometry == 20) then
-                    call s_2D_TaylorGreen_vortex(i, patch_id_fp, q_prim_vf)    
-
                 end if
 
             end do
@@ -380,7 +376,7 @@ contains
 
         ! Set fluid flow properties
         gam = 1.+1./fluid_pp(1)%gamma
-        pi_inf = fluid_pp(1)%pi_inf*(gam-1.)/gam
+        pi_inf = fluid_pp(1)%pi_inf*(gam-1d0)/gam
         if (bubbles .and. num_fluids == 1) then
             rho1 = patch_icpp(1)%alpha_rho(1)/(1d0-patch_icpp(1)%alpha(1))
         else
@@ -388,6 +384,7 @@ contains
         end if
         c1 = sqrt((gam*(patch_icpp(1)%pres+pi_inf))/rho1)
         mach = 1./c1
+        write(*,*) gam, pi_inf, rho1, c1, mach
 
         ! Assign mean profiles
         do j=0,n
@@ -514,6 +511,8 @@ contains
             vni(i) = ci
         end do
 
+        call write_eigvec(5*(n+1),alpha,beta,vnr,vni)
+
         ! Generate an instability wave
         do i=0,m
         do j=0,n
@@ -533,6 +532,36 @@ contains
         end do
     
     end subroutine s_generate_wave
+
+!====================================================================
+	subroutine write_eigvec(nl,alpha,beta,vnr,vni)
+		integer nl
+		real(kind(0d0)), dimension(0:nl-1) :: vnr,vni
+		real(kind(0d0)) :: alpha,beta,a,b
+		character*20 :: fname
+		integer j
+
+        a = alpha*(x_domain%end-x_domain%beg)/(2*pi)
+        b =  beta*(z_domain%end-z_domain%beg)/(2*pi)
+        
+		if (beta .lt. 0) then
+			write(fname,'(A,i1,A,i1,A)') 'eig_',int(a),'_n',int(abs(b)),'.dat'
+		else
+			write(fname,'(A,i1,A,i1,A)') 'eig_',int(a),'_',int(b),'.dat'
+		end if
+
+		open(1,file=fname)
+		do j=0,n
+			write(1,123) y_cc(j),vnr((n+1)+j),vnr(2*(n+1)+j),vnr(3*(n+1)+j) &
+								,vni((n+1)+j),vni(2*(n+1)+j),vni(3*(n+1)+j)
+		end do
+		close(1)
+		
+123		format(7f12.6)
+	
+	end subroutine write_eigvec
+
+!====================================================================    
 
     !>  Deallocation procedures for the module
     subroutine s_finalize_initial_condition_module() ! ---------------------

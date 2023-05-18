@@ -262,6 +262,8 @@ module m_global_parameters
     integer :: nmomtot   !< Total number of carried moments moments/transport equations
     integer :: R0_type
 
+    real(kind(0d0)) :: pi_fac   !< Factor for artificial pi_inf
+
     #:if not MFC_CASE_OPTIMIZATION
         !$acc declare create(nb)
     #:endif
@@ -405,6 +407,8 @@ contains
         Re_inv = dflt_real
         Web = dflt_real
         poly_sigma = dflt_real
+
+        pi_fac = 1d0
 
         ! Monopole source
         monopole = .false.
@@ -581,7 +585,7 @@ contains
 
                     if (nb == 1) then
                         weight(:) = 1d0
-                        R0(:) = 1d0
+                        R0(:) = 1d0 !R0ref       ! Modified line
                         V0(:) = 1d0
                     else if (nb > 1) then
                         if (R0_type == 1) then
