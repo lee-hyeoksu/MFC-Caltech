@@ -91,7 +91,7 @@ SIMULATION = COMMON + [
     'mixture_err', 'lsq_deriv', 'fd_order', 'num_probes', 'probe_wrt', 
     'bubble_model', 'Monopole', 'num_mono', 'qbmm', 'R0_type', 'integral_wrt', 
     'num_integrals', 'cu_mpi', 'palpha_eps', 'ptgalpha_eps', 
-    'pi_fac', 'adap_dt', 'ib', 'num_ibs'
+    'pi_fac', 'adap_dt', 'ib', 'num_ibs', 'apc'
 ]
 
 for ib_id in range(1, 10+1):
