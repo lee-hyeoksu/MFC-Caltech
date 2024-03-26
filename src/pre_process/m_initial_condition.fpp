@@ -389,10 +389,14 @@ contains
         real(kind(0d0)) :: tr, ti
         real(kind(0d0)) :: Lx, Lz
         integer :: i, j, k
+        real(kind(0d0)) :: xratio, uratio
 
-        Lx = x_domain%end - x_domain%beg
+        xratio = 50e-6/0.002475
+        uratio = (8236./1000.)**0.5d0/3.4343
+        
+        Lx = (x_domain%end - x_domain%beg)*xratio
         if (p > 0) then
-            Lz = z_domain%end - z_domain%beg
+            Lz = (z_domain%end - z_domain%beg)*xratio
         end if
 
         wave = 0d0
@@ -430,12 +434,12 @@ contains
             do j = 0, n
                 do i = 0, m
                     q_prim_vf(cont_idx%beg)%sf(i, j, k) = q_prim_vf(cont_idx%beg)%sf(i, j, k) + wave(1, i, j, k)       ! rho
-                    q_prim_vf(mom_idx%beg)%sf(i, j, k) = q_prim_vf(mom_idx%beg)%sf(i, j, k) + wave(2, i, j, k)       ! u
-                    q_prim_vf(mom_idx%beg + 1)%sf(i, j, k) = q_prim_vf(mom_idx%beg + 1)%sf(i, j, k) + wave(3, i, j, k)       ! v
+                    q_prim_vf(mom_idx%beg)%sf(i, j, k) = q_prim_vf(mom_idx%beg)%sf(i, j, k) + wave(2, i, j, k) / uratio       ! u
+                    q_prim_vf(mom_idx%beg + 1)%sf(i, j, k) = q_prim_vf(mom_idx%beg + 1)%sf(i, j, k) + wave(3, i, j, k)  / uratio      ! v
                     if (p > 0) then
-                        q_prim_vf(mom_idx%beg + 2)%sf(i, j, k) = q_prim_vf(mom_idx%beg + 2)%sf(i, j, k) + wave(4, i, j, k)   ! w
+                        q_prim_vf(mom_idx%beg + 2)%sf(i, j, k) = q_prim_vf(mom_idx%beg + 2)%sf(i, j, k) + wave(4, i, j, k) / uratio  ! w
                     end if
-                    q_prim_vf(E_idx)%sf(i, j, k) = q_prim_vf(E_idx)%sf(i, j, k) + wave(5, i, j, k)                       ! p
+                    q_prim_vf(E_idx)%sf(i, j, k) = q_prim_vf(E_idx)%sf(i, j, k) + wave(5, i, j, k)  / uratio**2                      ! p
                 end do
             end do
         end do
@@ -465,40 +469,45 @@ contains
         real(kind(0d0)), dimension(5, 0:m, 0:n, 0:p) :: wave !< instability wave
         real(kind(0d0)) :: shift !< phase shift
         real(kind(0d0)) :: gam, pi_inf, rho1, mach, c1
+        real(kind(0d0)) :: xratio, uratio
         integer :: ierr
         integer :: i, j, k, l !<  generic loop iterators
         integer :: ii, jj !< block matrix indices
 
+        xratio = 50e-6/0.002475
+        uratio = (8236./1000.)**0.5d0/3.4343
+
         ! Set fluid flow properties
         gam = 1d0+1d0/fluid_pp(1)%gamma
-        pi_inf = fluid_pp(1)%pi_inf*(gam - 1d0)/gam
+        pi_inf = fluid_pp(1)%pi_inf*(gam - 1d0)/gam * uratio**2
         if (bubbles .and. num_fluids == 1) then
             rho1 = patch_icpp(1)%alpha_rho(1)/(1d0 - patch_icpp(1)%alpha(1))
         else
             rho1 = patch_icpp(1)%alpha_rho(1)/patch_icpp(1)%alpha(1)
         end if
+        p_mean = patch_icpp(1)%pres*uratio**2
         c1 = sqrt((gam*(patch_icpp(1)%pres + pi_inf))/rho1)
         mach = 1d0/c1
 
         ! Assign mean profiles
         do j = 0, n + 1
-            u_mean(j) = tanh(y_cb(j-1))
+            u_mean(j) = tanh(y_cb(j-1)*xratio)
             rho_mean(j) = 1d0/(1d0 + 0.5d0*(gam - 1)*mach**2*(1 - u_mean(j)**2))
         end do
 
-        p_mean = patch_icpp(1)%pres
+        print *, pi_inf, mach, p_mean
 
         ! Compute differential operator in y-dir
         ! based on 2nd order central difference
         d = 0d0
-        d(0, 0) = -1/(y_cb(0) - y_cb(-1))
-        d(0, 1) = 1/(y_cb(0) - y_cb(-1))
+        d(0, 0) = -1d0/((y_cb(0) - y_cb(-1))*xratio)
+        d(0, 1) = 1d0/((y_cb(0) - y_cb(-1))*xratio)
         do j = 1, n
-            d(j, j - 1) = -1/(y_cb(j) - y_cb(j - 2))
-            d(j, j + 1) = 1/(y_cb(j) - y_cb(j - 2))
+            d(j, j - 1) = -1d0/((y_cb(j) - y_cb(j - 2))*xratio)
+            d(j, j + 1) = 1d0/((y_cb(j) - y_cb(j - 2))*xratio)
         end do
-        d(n + 1, n) = -1/(y_cb(n) - y_cb(n - 1))
-        d(n + 1, n + 1) = 1/(y_cb(n) - y_cb(n - 1))
+        d(n + 1, n) = -1d0/((y_cb(n) - y_cb(n - 1))*xratio)
+        d(n + 1, n + 1) = 1d0/((y_cb(n) - y_cb(n - 1))*xratio)
 
         ! Compute y-derivatives of rho and u
         do j = 0, n + 1
@@ -690,6 +699,9 @@ contains
         real(kind(0d0)), dimension(0:n + 1) :: rho_mean
         integer idx
         integer i, j, k
+        real(kind(0d0)) :: xratio
+
+        xratio = 50e-6/0.002475
 
         ! Find the most unstable eigenvalue and corresponding eigenvector
         k = 0
@@ -780,9 +792,9 @@ contains
             do j = 0, n
                 do k = 0, p
                     if (beta == 0) then
-                        ang = alpha*x_cc(i)
+                        ang = alpha*x_cc(i)*xratio
                     else
-                        ang = alpha*x_cc(i) + beta*z_cc(k) + shift
+                        ang = alpha*x_cc(i)*xratio + beta*z_cc(k)*xratio + shift
                     end if
                     wave(1, i, j, k) = xcr(            j)*cos(ang) - xci(            j)*sin(ang) ! rho
                     wave(2, i, j, k) = xcr(  (n + 1) + j)*cos(ang) - xci(  (n + 1) + j)*sin(ang) ! u
@@ -801,9 +813,12 @@ contains
         real(kind(0d0)) :: alpha,beta,a,b
         character*20 :: fname
         integer j
+        real(kind(0d0)) :: xratio
 
-        a = alpha*(x_domain%end-x_domain%beg)/(2*pi)
-        b =  beta*(z_domain%end-z_domain%beg)/(2*pi)
+        xratio = 50e-6/0.002475
+
+        a = alpha*(x_domain%end-x_domain%beg)*xratio/(2*pi)
+        b =  beta*(z_domain%end-z_domain%beg)*xratio/(2*pi)
 
         if (beta .lt. 0) then
             write(fname,'(A,i1,A,i1,A)') 'eig_',int(a),'_n',int(abs(b)),'.dat'
