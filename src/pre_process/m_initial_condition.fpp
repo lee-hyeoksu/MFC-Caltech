@@ -478,7 +478,11 @@ contains
         uratio = (8236./1000.)**0.5d0/3.4343
 
         ! Set fluid flow properties
-        adv = patch_icpp(1)%alpha(1)
+        if (bubbles) then
+            adv = patch_icpp(1)%alpha(1)
+        else
+            adv = 0d0
+        end if 
         gam = 1d0 + 1d0/(fluid_pp(1)%gamma*(1d0 - adv))
         pi_inf = (1d0 - adv)*fluid_pp(1)%pi_inf*(gam - 1d0)/gam * uratio**2
         ! if (bubbles .and. num_fluids == 1) then
