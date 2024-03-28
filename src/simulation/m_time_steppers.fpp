@@ -848,8 +848,6 @@ contains
 
         call s_compute_bubble_source(q_cons_ts(1)%vf, q_prim_vf, t_step, rhs_vf)
 
-        call s_comp_alpha_from_n(q_cons_ts(1)%vf)
-
     end subroutine s_adaptive_dt_bubble ! ------------------------------
 
     !> This subroutine saves the temporary q_prim_vf vector
