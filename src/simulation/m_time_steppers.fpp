@@ -806,7 +806,9 @@ contains
         call s_3rd_order_tvd_rk(t_step, time_avg, 0.5d0*dt)
 
         ! Stage 2 of 3 =====================================================
+        ! if (t_step * dt > 41.36*5) then
         call s_adaptive_dt_bubble(t_step)
+        ! end if
 
         ! Stage 3 of 3 =====================================================
         call s_3rd_order_tvd_rk(t_step, time_avg, 0.5d0*dt)
@@ -847,6 +849,8 @@ contains
             ix, iy, iz)
 
         call s_compute_bubble_source(q_cons_ts(1)%vf, q_prim_vf, t_step, rhs_vf)
+
+        call s_comp_alpha_from_n(q_cons_ts(1)%vf)
 
     end subroutine s_adaptive_dt_bubble ! ------------------------------
 

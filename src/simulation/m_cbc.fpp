@@ -134,8 +134,8 @@ contains
         if (weno_order > 1) then
 
             allocate (F_rsx_vf(0:buff_size, &
-                               is2%beg:is2%end, &
-                               is3%beg:is3%end, 1:adv_idx%end))
+                            is2%beg:is2%end, &
+                            is3%beg:is3%end, 1:adv_idx%end))
 
             allocate (F_src_rsx_vf(0:buff_size, &
                                    is2%beg:is2%end, &
@@ -144,8 +144,8 @@ contains
         end if
 
         allocate (flux_rsx_vf(-1:buff_size, &
-                              is2%beg:is2%end, &
-                              is3%beg:is3%end, 1:adv_idx%end))
+                            is2%beg:is2%end, &
+                            is3%beg:is3%end, 1:adv_idx%end))
 
         allocate (flux_src_rsx_vf(-1:buff_size, &
                                   is2%beg:is2%end, &
@@ -177,8 +177,8 @@ contains
             if (weno_order > 1) then
 
                 allocate (F_rsy_vf(0:buff_size, &
-                                   is2%beg:is2%end, &
-                                   is3%beg:is3%end, 1:adv_idx%end))
+                                is2%beg:is2%end, &
+                                is3%beg:is3%end, 1:adv_idx%end))
 
                 allocate (F_src_rsy_vf(0:buff_size, &
                                        is2%beg:is2%end, &
@@ -187,8 +187,8 @@ contains
             end if
 
             allocate (flux_rsy_vf(-1:buff_size, &
-                                  is2%beg:is2%end, &
-                                  is3%beg:is3%end, 1:adv_idx%end))
+                                is2%beg:is2%end, &
+                                is3%beg:is3%end, 1:adv_idx%end))
 
             allocate (flux_src_rsy_vf(-1:buff_size, &
                                       is2%beg:is2%end, &
@@ -222,8 +222,8 @@ contains
             if (weno_order > 1) then
 
                 allocate (F_rsz_vf(0:buff_size, &
-                                   is2%beg:is2%end, &
-                                   is3%beg:is3%end, 1:adv_idx%end))
+                                is2%beg:is2%end, &
+                                is3%beg:is3%end, 1:adv_idx%end))
 
                 allocate (F_src_rsz_vf(0:buff_size, &
                                        is2%beg:is2%end, &
@@ -232,8 +232,8 @@ contains
             end if
 
             allocate (flux_rsz_vf(-1:buff_size, &
-                                  is2%beg:is2%end, &
-                                  is3%beg:is3%end, 1:adv_idx%end))
+                                is2%beg:is2%end, &
+                                is3%beg:is3%end, 1:adv_idx%end))
 
             allocate (flux_src_rsz_vf(-1:buff_size, &
                                       is2%beg:is2%end, &
@@ -763,7 +763,11 @@ contains
                         H = (E + pres)/rho
 
                         ! Compute mixture sound speed
-                        call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, adv, vel_K_sum, c)
+                        if (bubbles .and. num_fluids == 1) then
+                            call s_compute_speed_of_sound(pres, rho, gamma/(1d0 - adv(1)), pi_inf/(1d0 - adv(1)), H, adv, vel_K_sum, c)
+                        else
+                            call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, adv, vel_K_sum, c)
+                        end if
                         ! ============================================================
 
                         ! First-Order Spatial Derivatives of Primitive Variables =====
@@ -1200,7 +1204,7 @@ contains
                     end do
                 end do
             end do
-
+            
             !$acc parallel loop collapse(3) gang vector default(present)
             do r = is3%beg, is3%end
                 do k = is2%beg, is2%end

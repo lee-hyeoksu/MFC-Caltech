@@ -468,7 +468,7 @@ contains
         real(kind(0d0)) :: tr, ti !< most unstable eigenvalue
         real(kind(0d0)), dimension(5, 0:m, 0:n, 0:p) :: wave !< instability wave
         real(kind(0d0)) :: shift !< phase shift
-        real(kind(0d0)) :: gam, pi_inf, rho1, mach, c1
+        real(kind(0d0)) :: gam, pi_inf, rho, mach, c1, adv
         real(kind(0d0)) :: xratio, uratio
         integer :: ierr
         integer :: i, j, k, l !<  generic loop iterators
@@ -478,24 +478,26 @@ contains
         uratio = (8236./1000.)**0.5d0/3.4343
 
         ! Set fluid flow properties
-        gam = 1d0+1d0/fluid_pp(1)%gamma
-        pi_inf = fluid_pp(1)%pi_inf*(gam - 1d0)/gam * uratio**2
-        if (bubbles .and. num_fluids == 1) then
-            rho1 = patch_icpp(1)%alpha_rho(1)/(1d0 - patch_icpp(1)%alpha(1))
-        else
-            rho1 = patch_icpp(1)%alpha_rho(1)/patch_icpp(1)%alpha(1)
-        end if
+        adv = patch_icpp(1)%alpha(1)
+        gam = 1d0 + 1d0/(fluid_pp(1)%gamma*(1d0 - adv))
+        pi_inf = (1d0 - adv)*fluid_pp(1)%pi_inf*(gam - 1d0)/gam * uratio**2
+        ! if (bubbles .and. num_fluids == 1) then
+        !     rho1 = patch_icpp(1)%alpha_rho(1)/(1d0 - patch_icpp(1)%alpha(1))
+        ! else
+        !     rho1 = patch_icpp(1)%alpha_rho(1)/patch_icpp(1)%alpha(1)
+        ! end if
+        rho = patch_icpp(1)%alpha_rho(1)
         p_mean = patch_icpp(1)%pres*uratio**2
-        c1 = sqrt((gam*(patch_icpp(1)%pres + pi_inf))/rho1)
+        c1 = sqrt((gam*(patch_icpp(1)%pres + pi_inf))/(rho*(1d0 - adv)))
         mach = 1d0/c1
 
         ! Assign mean profiles
         do j = 0, n + 1
             u_mean(j) = tanh(y_cb(j-1)*xratio)
-            rho_mean(j) = 1d0/(1d0 + 0.5d0*(gam - 1)*mach**2*(1 - u_mean(j)**2))
+            rho_mean(j) = rho/(1d0 + 0.5d0*(gam - 1)*mach**2*(1 - u_mean(j)**2))
         end do
 
-        print *, pi_inf, mach, p_mean
+        ! print *, rho, p_mean, c1, pi_inf, mach, p_mean
 
         ! Compute differential operator in y-dir
         ! based on 2nd order central difference
