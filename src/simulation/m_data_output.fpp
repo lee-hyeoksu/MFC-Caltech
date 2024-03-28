@@ -281,7 +281,11 @@ contains
                     H = (E + pres)/rho
 
                     ! Compute mixture sound speed
-                    call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, alpha, vel_sum, c)
+                    if (bubbles .and. num_fluids == 1) then
+                        call s_compute_speed_of_sound(pres, rho, gamma/(1d0-alpha(1)), pi_inf/(1d0-alpha(1)), H, alpha, vel_sum, c)
+                    else
+                        call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, alpha, vel_sum, c)
+                    end if
 
                     if (grid_geometry == 3) then
                         if (k == 0) then
