@@ -140,8 +140,7 @@ contains
         if ((model_eqns /= 4) .and. (bubbles .neqv. .true.)) then
             pres = (energy - dyn_p - pi_inf - qv)/gamma
         else if ((model_eqns /= 4) .and. bubbles) then
-            ! pres = ((energy - dyn_p)/(1.d0 - alf) - pi_inf - qv)/gamma
-            pres = (energy - dyn_p - pi_inf - qv)/gamma
+            pres = ((energy - dyn_p)/(1.d0 - alf) - pi_inf - qv)/gamma
         else
             pres = (pref + pi_inf)* &
                    (energy/ &
@@ -310,9 +309,9 @@ contains
                 ! pi_inf_K = fluid_pp(1)%pi_inf
             else
                 rho = q_vf(1)%sf(j, k, l)
-                gamma = fluid_pp(1)%gamma * (1d0 - alpha_K(1))
-                pi_inf = fluid_pp(1)%pi_inf * (1d0 - alpha_K(1))
-                qv = fluid_pp(1)%qv * (1d0 - alpha_K(1))
+                gamma = fluid_pp(1)%gamma
+                pi_inf = fluid_pp(1)%pi_inf
+                qv = fluid_pp(1)%qv
             end if
         end if
 
@@ -562,9 +561,9 @@ contains
             end do
         else
             rho_K = alpha_rho_K(1)
-            gamma_K = gammas(1)*(1d0 - alpha_K(1))
-            pi_inf_K = pi_infs(1)*(1d0 - alpha_K(1))
-            qv_K = qvs(1)*(1d0 - alpha_K(1))
+            gamma_K = gammas(1)
+            pi_inf_K = pi_infs(1)
+            qv_K = qvs(1)
         end if
 
         if (any(Re_size > 0)) then
@@ -1065,10 +1064,8 @@ contains
                             + qv
                     else if ((model_eqns /= 4) .and. (bubbles)) then
                         ! \tilde{E} = dyn_pres + (1-\alf)(\Gamma p_l + \Pi_inf)
-                        ! q_cons_vf(E_idx)%sf(j, k, l) = dyn_pres + &
-                        !                                (1.d0 - q_prim_vf(alf_idx)%sf(j, k, l))* &
-                        !                                (gamma*q_prim_vf(E_idx)%sf(j, k, l) + pi_inf)
                         q_cons_vf(E_idx)%sf(j, k, l) = dyn_pres + &
+                                                       (1.d0 - q_prim_vf(alf_idx)%sf(j, k, l))* &
                                                        (gamma*q_prim_vf(E_idx)%sf(j, k, l) + pi_inf)
                     else
                         !Tait EOS, no conserved energy variable

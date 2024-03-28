@@ -483,13 +483,8 @@ contains
         else
             adv = 0d0
         end if 
-        gam = 1d0 + 1d0/(fluid_pp(1)%gamma*(1d0 - adv))
-        pi_inf = (1d0 - adv)*fluid_pp(1)%pi_inf*(gam - 1d0)/gam * uratio**2
-        ! if (bubbles .and. num_fluids == 1) then
-        !     rho1 = patch_icpp(1)%alpha_rho(1)/(1d0 - patch_icpp(1)%alpha(1))
-        ! else
-        !     rho1 = patch_icpp(1)%alpha_rho(1)/patch_icpp(1)%alpha(1)
-        ! end if
+        gam = 1d0 + 1d0/fluid_pp(1)%gamma
+        pi_inf = fluid_pp(1)%pi_inf*(gam - 1d0)/gam * uratio**2
         rho = patch_icpp(1)%alpha_rho(1)
         p_mean = patch_icpp(1)%pres*uratio**2
         c1 = sqrt((gam*(patch_icpp(1)%pres + pi_inf))/(rho*(1d0 - adv)))
@@ -500,8 +495,6 @@ contains
             u_mean(j) = tanh(y_cb(j-1)*xratio)
             rho_mean(j) = rho/(1d0 + 0.5d0*(gam - 1)*mach**2*(1 - u_mean(j)**2))
         end do
-
-        ! print *, rho, p_mean, c1, pi_inf, mach, p_mean
 
         ! Compute differential operator in y-dir
         ! based on 2nd order central difference

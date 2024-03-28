@@ -320,7 +320,7 @@ contains
                             myV_tmp(1) = myV
                             myA_tmp(1) = f_rddot(myRho, myP, myR_tmp(1), myV_tmp(1), R0(q), &
                                                  pb, pbdot, alf, n_tait, B_tait, &
-                                                 bub_adv_src(j, k, l), divu%sf(j, k, l), 0, 0)
+                                                 bub_adv_src(j, k, l), divu%sf(j, k, l))
 
                             ! Compute d0 = ||y0|| and d1 = ||f(x0,y0)||
                             d0 = DSQRT((myR_tmp(1)**2d0 + myV_tmp(1)**2d0)/2d0)
@@ -336,7 +336,7 @@ contains
                             myV_tmp(2) = myV_tmp(1) + h0*myA_tmp(1)
                             myA_tmp(2) = f_rddot(myRho, myP, myR_tmp(2), myV_tmp(2), R0(q), &
                                                  pb, pbdot, alf, n_tait, B_tait, &
-                                                 bub_adv_src(j, k, l), divu%sf(j, k, l), 0, 0)
+                                                 bub_adv_src(j, k, l), divu%sf(j, k, l))
 
                             ! Compute d2 = ||f(x0+h0,y0+h0*f(x0,y0))-f(x0,y0)||/h0
                             d2 = DSQRT(((myV_tmp(2) - myV_tmp(1))**2d0 + (myA_tmp(2) - myA_tmp(1))**2d0)/2d0)/h0
@@ -359,11 +359,7 @@ contains
                                 if (t_new + h > dt) then
                                     h = dt - t_new
                                 end if
-                                ! if (j == 182 .and. k == 96) then
-                                !     print *, h, dt, t_new
-                                !     print *, myRho, myP, nbub
-                                ! end if
-                                ii = 0
+
                                 ! Advancing one sub-step
                                 do while (.true.)
                                     ! Advance one sub-step and evaluate the error
@@ -372,28 +368,28 @@ contains
                                     myV_tmp(1) = myV
                                     myA_tmp(1) = f_rddot(myRho, myP, myR_tmp(1), myV_tmp(1), R0(q), &
                                                          pb, pbdot, alf, n_tait, B_tait, &
-                                                         bub_adv_src(j, k, l), divu%sf(j, k, l), j, k)
+                                                         bub_adv_src(j, k, l), divu%sf(j, k, l))
 
                                     ! Stage 1
                                     myR_tmp(2) = myR_tmp(1) + h*myV_tmp(1)
                                     myV_tmp(2) = myV_tmp(1) + h*myA_tmp(1)
                                     myA_tmp(2) = f_rddot(myRho, myP, myR_tmp(2), myV_tmp(2), R0(q), &
                                                          pb, pbdot, alf, n_tait, B_tait, &
-                                                         bub_adv_src(j, k, l), divu%sf(j, k, l), j, k)
+                                                         bub_adv_src(j, k, l), divu%sf(j, k, l))
 
                                     ! Stage 2
                                     myR_tmp(3) = myR_tmp(1) + (h/4d0)*(myV_tmp(1) + myV_tmp(2))
                                     myV_tmp(3) = myV_tmp(1) + (h/4d0)*(myA_tmp(1) + myA_tmp(2))
                                     myA_tmp(3) = f_rddot(myRho, myP, myR_tmp(3), myV_tmp(3), R0(q), &
                                                          pb, pbdot, alf, n_tait, B_tait, &
-                                                         bub_adv_src(j, k, l), divu%sf(j, k, l), j, k)
+                                                         bub_adv_src(j, k, l), divu%sf(j, k, l))
 
                                     ! Stage 3
                                     myR_tmp(4) = myR_tmp(1) + (h/6d0)*(myV_tmp(1) + myV_tmp(2) + 4*myV_tmp(3))
                                     myV_tmp(4) = myV_tmp(1) + (h/6d0)*(myA_tmp(1) + myA_tmp(2) + 4*myA_tmp(3))
                                     myA_tmp(4) = f_rddot(myRho, myP, myR_tmp(4), myV_tmp(4), R0(q), &
                                                          pb, pbdot, alf, n_tait, B_tait, &
-                                                         bub_adv_src(j, k, l), divu%sf(j, k, l), j, k)
+                                                         bub_adv_src(j, k, l), divu%sf(j, k, l))
 
                                     ! Estimate error
                                     err_R = (-5d0*h/24d0)*(myV_tmp(2) + myV_tmp(3) - 2d0*myV_tmp(4)) &
@@ -401,16 +397,6 @@ contains
                                     err_V = (-5d0*h/24d0)*(myA_tmp(2) + myA_tmp(3) - 2d0*myA_tmp(4)) &
                                             /max(abs(myV_tmp(1)), abs(myV_tmp(4)))
                                     err = DSQRT((err_R**2d0 + err_V**2d0)/2d0)/1d-2 ! Rtol = 1e-2
-
-                                    ! if (j == 182 .and. k == 96) then
-                                    !     print *, ii
-                                    !     print *, myR_tmp(1), myV_tmp(1), myA_tmp(1)
-                                    !     print *, myR_tmp(2), myV_tmp(2), myA_tmp(2)
-                                    !     print *, myR_tmp(3), myV_tmp(3), myA_tmp(3)
-                                    !     print *, myR_tmp(4), myV_tmp(4), myA_tmp(4)
-                                    !     print *, err_R, err_V, err
-                                    !     print *, " "
-                                    ! end if
 
                                     ! Determine acceptance/rejection and update step size
                                     if ((err <= 1d0) .and. myR_tmp(4) > 0d0) then
@@ -430,7 +416,6 @@ contains
                                         else
                                             h = 0.5d0*h
                                         end if
-                                        ii = ii + 1
                                     end if
 
                                     if (h < h_min) h_min = h
@@ -447,7 +432,7 @@ contains
                         else
                             rddot = f_rddot(myRho, myP, myR, myV, R0(q), &
                                             pb, pbdot, alf, n_tait, B_tait, &
-                                            bub_adv_src(j, k, l), divu%sf(j, k, l), j, k)
+                                            bub_adv_src(j, k, l), divu%sf(j, k, l))
                             bub_v_src(j, k, l, q) = nbub*rddot
                             bub_r_src(j, k, l, q) = q_cons_vf(vs(q))%sf(j, k, l)
                         end if
@@ -628,13 +613,12 @@ contains
         !!  @param fBtait Tait EOS parameter
         !!  @param f_bub_adv_src Source for bubble volume fraction
         !!  @param f_divu Divergence of velocity
-    function f_rddot(fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, fntait, fBtait, f_bub_adv_src, f_divu, j, k)
+    function f_rddot(fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, fntait, fBtait, f_bub_adv_src, f_divu)
         !$acc routine seq
         real(kind(0d0)), intent(IN) :: fRho, fP, fR, fV, fR0, fpb, fpbdot, alf
         real(kind(0d0)), intent(IN) :: fntait, fBtait, f_bub_adv_src, f_divu
         real(kind(0d0)) :: fCpbw, fCpinf, fCpinf_dot, fH, fHdot, c_gas, c_liquid
         real(kind(0d0)) :: f_rddot
-        integer :: j, k
 
         if (bubble_model == 1) then
             ! Gilmore bubbles

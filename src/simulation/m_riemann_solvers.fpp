@@ -1560,12 +1560,6 @@ contains
 
                                 E_L = gamma_L*pres_L + pi_inf_L + 5d-1*rho_L*vel_L_rms
                                 E_R = gamma_R*pres_R + pi_inf_R + 5d-1*rho_R*vel_R_rms
-                                
-                                ! if (norm_dir == 1 .and. j == 177 .and. k == 94) then
-                                !     print *, E_L, gamma_L, pres_L, pi_inf_L, rho_L, vel_L_rms
-                                !     print *, E_R, gamma_R, pres_R, pi_inf_R, rho_R, vel_R_rms
-                                !     print *, " "
-                                ! end if
 
                                 H_L = (E_L + pres_L)/rho_L
                                 H_R = (E_R + pres_R)/rho_R
@@ -1664,8 +1658,6 @@ contains
                                         ptilde_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + num_fluids)*(pres_R - PbwR3Rbar/R3Rbar - &
                                                                                                           rho_R*R3V2Rbar/R3Rbar)
                                     end if
-
-                                    ! ptilde_L = 0d0; ptilde_R = 0d0;
 
                                     if ((ptilde_L /= ptilde_L) .or. (ptilde_R /= ptilde_R)) then
                                     end if
@@ -1793,16 +1785,16 @@ contains
                                                      s_M*(xi_L*(dir_flg(idxi)*s_S + &
                                                                 (1d0 - dir_flg(idxi))* &
                                                                 vel_L(idxi)) - vel_L(idxi))) + &
-                                              dir_flg(idxi)*(pres_L - ptilde_L) + &
-                                              (s_M/s_L)*(s_P/s_R)*dir_flg(idxi)*pcorr * s_L/(s_L - s_S)) &
+                                              dir_flg(idxi)*(pres_L - ptilde_L)) &
+                                            !   (s_M/s_L)*(s_P/s_R)*dir_flg(idxi)*pcorr * s_L/(s_L - s_S)) &
                                         + xi_P*(rho_R*(vel_R(idx1)* &
                                                        vel_R(idxi) + &
                                                        s_P*(xi_R*(dir_flg(idxi)*s_S + &
                                                                   (1d0 - dir_flg(idxi))* &
                                                                   vel_R(idxi)) - vel_R(idxi))) + &
-                                                dir_flg(idxi)*(pres_R - ptilde_R) + &
-                                                (s_M/s_L)*(s_P/s_R)*dir_flg(idxi)*pcorr * s_R/(s_R - s_S))
-                                        ! + (s_M/s_L)*(s_P/s_R)*dir_flg(idxi)*pcorr
+                                                dir_flg(idxi)*(pres_R - ptilde_R)) &
+                                                ! (s_M/s_L)*(s_P/s_R)*dir_flg(idxi)*pcorr * s_R/(s_R - s_S))
+                                        + (s_M/s_L)*(s_P/s_R)*dir_flg(idxi)*pcorr
                                 end do
 
                                 ! Energy flux.
@@ -1811,14 +1803,14 @@ contains
                                     xi_M*(vel_L(idx1)*(E_L + pres_L - ptilde_L) + &
                                           s_M*(xi_L*(E_L + (s_S - vel_L(idx1))* &
                                                      (rho_L*s_S + (pres_L - ptilde_L)/ &
-                                                      (s_L - vel_L(idx1)))) - E_L) + &
-                                                      + (s_M/s_L)*(s_P/s_R)*pcorr*s_S*s_L/(s_L - s_S)) &
+                                                      (s_L - vel_L(idx1)))) - E_L)) &
+                                                    !   + (s_M/s_L)*(s_P/s_R)*pcorr*s_S*s_L/(s_L - s_S)) &
                                     + xi_P*(vel_R(idx1)*(E_R + pres_R - ptilde_R) + &
                                             s_P*(xi_R*(E_R + (s_S - vel_R(idx1))* &
                                                        (rho_R*s_S + (pres_R - ptilde_R)/ &
-                                                        (s_R - vel_R(idx1)))) - E_R) + &
-                                                        + (s_M/s_L)*(s_P/s_R)*pcorr*s_S*s_R/(s_R - s_S))
-                                    ! + (s_M/s_L)*(s_P/s_R)*pcorr*s_S
+                                                        (s_R - vel_R(idx1)))) - E_R)) &
+                                                        ! + (s_M/s_L)*(s_P/s_R)*pcorr*s_S*s_R/(s_R - s_S))
+                                    + (s_M/s_L)*(s_P/s_R)*pcorr*s_S
 
                                 ! Volume fraction flux
                                 !$acc loop seq
