@@ -1375,7 +1375,7 @@ contains
 
             ! RHS additions for sub-grid bubbles
             call nvtxStartRange("RHS_bubbles")
-            if (bubbles) call s_compute_bubbles_rhs(id, &
+            if (bubbles .and. (.not. adap_dt)) call s_compute_bubbles_rhs(id, &
                                                     q_prim_qp%vf)
             call nvtxEndRange
 

@@ -196,7 +196,7 @@ contains
 
         real(kind(0d0)) :: err1, err2, err3 !< Error estimates for adaptive time stepping
         real(kind(0d0)) :: t_new !< Updated time step size
-        real(kind(0d0)) :: h, h_min !< Time step size
+        real(kind(0d0)) :: h !< Time step size
         real(kind(0d0)), dimension(4) :: myR_tmp1, myV_tmp1, myR_tmp2, myV_tmp2, myR_tmp3, myV_tmp3!< Bubble radius, radial velocity, and radial acceleration for the inner loop
 
         !$acc parallel loop collapse(3) gang vector default(present)
@@ -315,7 +315,6 @@ contains
 
                             ! Advancing one step
                             t_new = 0d0
-                            h_min = h
                             do while (.true.)
                                 if (t_new + h > dt) then
                                     h = dt - t_new
@@ -347,8 +346,8 @@ contains
                                     !   Rule 4: abs((myV_tmp1(4) - myV_tmp2(4))/myV) < tol
                                     if ((err1 <= 1d0) .and. (err2 <= 1d0) .and. (err3 <= 1d0) &
                                             .and. myR_tmp1(4) > 0d0 &
-                                            .and. abs((myR_tmp1(4) - myR_tmp2(4))/myR_tmp1(4)) < 1d-2 &
-                                            .and. abs((myV_tmp1(4) - myV_tmp2(4))/myV_tmp1(4)) < 1d-2) then
+                                            .and. abs((myR_tmp1(4) - myR_tmp2(4))/myR_tmp1(4)) < 1d-4 &
+                                            .and. abs((myV_tmp1(4) - myV_tmp2(4))/myV_tmp1(4)) < 1d-4) then
                                         ! Accepted. Finalize the sub-step
                                         myR = myR_tmp1(4)
                                         myV = myV_tmp1(4)
@@ -365,9 +364,8 @@ contains
                                         else
                                             h = 0.25d0*h
                                         end if
+                                        print *, h
                                     end if
-
-                                    if (h < h_min) h_min = h
                                 end do
 
                                 ! Exit the loop if the final time reached dt
@@ -377,7 +375,7 @@ contains
 
                             q_cons_vf(rs(q))%sf(j, k, l) = nbub*myR
                             q_cons_vf(vs(q))%sf(j, k, l) = nbub*myV
-
+                            
                         else
                             rddot = f_rddot(myRho, myP, myR, myV, R0(q), &
                                             pb, pbdot, alf, n_tait, B_tait, &

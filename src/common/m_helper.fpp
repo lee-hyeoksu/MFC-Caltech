@@ -141,7 +141,7 @@ contains
         !! @param q_cons_vf is the conservative variable
     subroutine s_bubble_checker(q_cons_vf)
         type(scalar_field), dimension(sys_size), intent(INOUT) :: q_cons_vf
-        integer :: i !< Generic loop iterator
+        integer :: i, j, k, l !< Generic loop iterator
 
         do i = 1, nb
             if (any(q_cons_vf(bub_idx%rs(i))%sf < 0d0)) call s_mpi_abort("nR < 0")
