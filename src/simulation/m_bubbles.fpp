@@ -316,8 +316,8 @@ contains
                             ! Advancing one step
                             t_new = 0d0
                             do while (.true.)
-                                if (t_new + h > dt) then
-                                    h = dt - t_new
+                                if (t_new + h > 0.5d0*dt) then
+                                    h = 0.5d0*dt - t_new
                                 end if
 
                                 ! Advancing one sub-step
@@ -340,11 +340,11 @@ contains
                                                       myR_tmp2, myV_tmp2, err3)
 
                                     ! Determine acceptance/rejection and update step size
-                                    !   Rule 1: err1, err2, err3 < 1d0
+                                    !   Rule 1: err1, err2, err3 < tol
                                     !   Rule 2: myR_tmp1(4) > 0d0
                                     !   Rule 3: abs((myR_tmp1(4) - myR_tmp2(4))/myR) < tol
                                     !   Rule 4: abs((myV_tmp1(4) - myV_tmp2(4))/myV) < tol
-                                    if ((err1 <= 1d0) .and. (err2 <= 1d0) .and. (err3 <= 1d0) &
+                                    if ((err1 <= 1d-4) .and. (err2 <= 1d-4) .and. (err3 <= 1d-4) &
                                             .and. myR_tmp1(4) > 0d0 &
                                             .and. abs((myR_tmp1(4) - myR_tmp2(4))/myR_tmp1(4)) < 1d-4 &
                                             .and. abs((myV_tmp1(4) - myV_tmp2(4))/myV_tmp1(4)) < 1d-4) then
@@ -354,22 +354,22 @@ contains
                                         t_new = t_new + h
 
                                         ! Update step size for the next sub-step
-                                        h = h*min(2d0, max(0.5d0, (1d0/err1)**(1d0/3d0)))
+                                        h = h*min(2d0, max(0.5d0, (1d-4/err1)**(1d0/3d0)))
 
                                         exit
                                     else
                                         ! Rejected. Update step size for the next try on sub-step
-                                        if (err2 <= 1d0) then
+                                        if (err2 <= 1d-4) then
                                             h = 0.5d0*h
                                         else
                                             h = 0.25d0*h
                                         end if
-                                        print *, h
+                                        ! print *, h
                                     end if
                                 end do
 
                                 ! Exit the loop if the final time reached dt
-                                if (t_new == dt) exit
+                                if (t_new == 0.5d0*dt) exit
 
                             end do
 
@@ -468,7 +468,7 @@ contains
 
         ! Set h = min(100*h0,h1)
         h = min(100d0*h0, h1)
-
+        
     end subroutine s_initialize_adap_dt
 
     subroutine s_advance_substep(fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, &
@@ -503,8 +503,8 @@ contains
                              f_bub_adv_src, f_divu)
 
         ! Stage 3
-        myR_tmp(4) = myR_tmp(1) + (h/6d0)*(myV_tmp(1) + myV_tmp(2) + 4*myV_tmp(3))
-        myV_tmp(4) = myV_tmp(1) + (h/6d0)*(myA_tmp(1) + myA_tmp(2) + 4*myA_tmp(3))
+        myR_tmp(4) = myR_tmp(1) + (h/6d0)*(myV_tmp(1) + myV_tmp(2) + 4d0*myV_tmp(3))
+        myV_tmp(4) = myV_tmp(1) + (h/6d0)*(myA_tmp(1) + myA_tmp(2) + 4d0*myA_tmp(3))
         myA_tmp(4) = f_rddot(fRho, fP, myR_tmp(4), myV_tmp(4), fR0, &
                              fpb, fpbdot, alf, fntait, fBtait, &
                              f_bub_adv_src, f_divu)
@@ -514,7 +514,7 @@ contains
                 /max(abs(myR_tmp(1)), abs(myR_tmp(4)))
         err_V = (-5d0*h/24d0)*(myA_tmp(2) + myA_tmp(3) - 2d0*myA_tmp(4)) &
                 /max(abs(myV_tmp(1)), abs(myV_tmp(4)))
-        err = DSQRT((err_R**2d0 + err_V**2d0)/2d0)/1d-2 ! Rtol = 1e-2
+        err = DSQRT((err_R**2d0 + err_V**2d0)/2d0)
 
     end subroutine s_advance_substep
 

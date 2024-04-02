@@ -1072,44 +1072,18 @@ contains
         print *, 'Computed derived vars'
 #endif
 
-        ! print *, q_cons_ts(1)%vf(1)%sf(170,90,0)
-        ! print *, q_cons_ts(1)%vf(2)%sf(170,90,0)/q_cons_ts(1)%vf(1)%sf(170,90,0)
-        ! print *, q_cons_ts(1)%vf(3)%sf(170,90,0)/q_cons_ts(1)%vf(1)%sf(170,90,0)
-        ! dyn_p = 0.5d0*( q_cons_ts(1)%vf(2)%sf(170,90,0)**2 + &
-        !                 q_cons_ts(1)%vf(3)%sf(170,90,0)**2) / &
-        !                 q_cons_ts(1)%vf(1)%sf(170,90,0)
-        ! print *, ((q_cons_ts(1)%vf(4)%sf(170,90,0) - dyn_p)/(1d0-q_cons_ts(1)%vf(5)%sf(170,90,0)) - pi_infs(1))/gammas(1)
-        ! print *, q_cons_ts(1)%vf(5)%sf(170,90,0)
-        ! print *, q_cons_ts(1)%vf(6)%sf(170,90,0)/q_cons_ts(1)%vf(8)%sf(170,90,0)
-        ! print *, q_cons_ts(1)%vf(7)%sf(170,90,0)/q_cons_ts(1)%vf(8)%sf(170,90,0)
-        ! print *, q_cons_ts(1)%vf(8)%sf(170,90,0)
-        ! print *, " "
-
         ! Total-variation-diminishing (TVD) Runge-Kutta (RK) time-steppers
         if (time_stepper == 1) then
             call s_1st_order_tvd_rk(t_step, time_avg)
         elseif (time_stepper == 2) then
             call s_2nd_order_tvd_rk(t_step, time_avg)
         elseif (time_stepper == 3 .and. (.not. adap_dt)) then
-            call s_3rd_order_tvd_rk(t_step, time_avg, dt)
+            call s_3rd_order_tvd_rk(t_step, time_avg)
         elseif (time_stepper == 3 .and. adap_dt) then
             call s_strang_splitting(t_step, time_avg)
         end if
 
         if (relax) call s_relaxation_solver(q_cons_ts(1)%vf)
-
-        ! print *, q_cons_ts(1)%vf(1)%sf(170,90,0)
-        ! print *, q_cons_ts(1)%vf(2)%sf(170,90,0)/q_cons_ts(1)%vf(1)%sf(170,90,0)
-        ! print *, q_cons_ts(1)%vf(3)%sf(170,90,0)/q_cons_ts(1)%vf(1)%sf(170,90,0)
-        ! dyn_p = 0.5d0*( q_cons_ts(1)%vf(2)%sf(170,90,0)**2 + &
-        !                 q_cons_ts(1)%vf(3)%sf(170,90,0)**2) / &
-        !                 q_cons_ts(1)%vf(1)%sf(170,90,0)
-        ! print *, ((q_cons_ts(1)%vf(4)%sf(170,90,0) - dyn_p)/(1d0-q_cons_ts(1)%vf(5)%sf(170,90,0)) - pi_infs(1))/gammas(1)
-        ! print *, q_cons_ts(1)%vf(5)%sf(170,90,0)
-        ! print *, q_cons_ts(1)%vf(6)%sf(170,90,0)/q_cons_ts(1)%vf(8)%sf(170,90,0)
-        ! print *, q_cons_ts(1)%vf(7)%sf(170,90,0)/q_cons_ts(1)%vf(8)%sf(170,90,0)
-        ! print *, q_cons_ts(1)%vf(8)%sf(170,90,0)
-        ! print *, " "
 
         ! Time-stepping loop controls
         if ((mytime + dt) >= finaltime) dt = finaltime - mytime
