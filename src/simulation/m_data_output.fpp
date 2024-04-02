@@ -343,7 +343,7 @@ contains
 
                         end if
                         if (icfl_sf(j, k, l) > 1d0) then
-                            print *, j, k, l, icfl_sf(j, k, l), vel(1), vel(2), c
+                            print *, j, k, l, icfl_sf(j, k, l), vel(1), vel(2), c, alpha(1)
                         end if
                     else
                         !1D

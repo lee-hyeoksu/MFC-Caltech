@@ -364,7 +364,7 @@ contains
                                         else
                                             h = 0.25d0*h
                                         end if
-                                        ! print *, h
+
                                     end if
                                 end do
 
