@@ -1007,6 +1007,7 @@ contains
         real(kind(0d0)) :: gamma
         real(kind(0d0)) :: pi_inf
         real(kind(0d0)) :: qv
+        real(kind(0d0)) :: p_gs
         real(kind(0d0)), dimension(2) :: Re
         real(kind(0d0)) :: pres
 
@@ -1023,9 +1024,10 @@ contains
                         dyn_pres = dyn_pres + 5d-1*v_vf(i)%sf(j, k, l)*v_vf(i)%sf(j, k, l) &
                                    /max(rho, sgm_eps)
                     end do
-
+                    
+                    p_gs = 0d0
                     call s_compute_pressure(v_vf(E_idx)%sf(j, k, l), 0d0, &
-                                            dyn_pres, pi_inf, gamma, rho, qv, pres)
+                                            dyn_pres, p_gs, pi_inf, gamma, rho, qv, pres)
 
                     do i = 1, num_fluids
                         v_vf(i + internalEnergies_idx%beg - 1)%sf(j, k, l) = v_vf(i + adv_idx%beg - 1)%sf(j, k, l)* &

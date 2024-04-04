@@ -468,7 +468,7 @@ contains
         real(kind(0d0)) :: tr, ti !< most unstable eigenvalue
         real(kind(0d0)), dimension(5, 0:m, 0:n, 0:p) :: wave !< instability wave
         real(kind(0d0)) :: shift !< phase shift
-        real(kind(0d0)) :: gam, pi_inf, rho, mach, c1, adv
+        real(kind(0d0)) :: gam_lit, pi_inf, rho, mach, c1, adv
         real(kind(0d0)) :: xratio, uratio
         integer :: ierr
         integer :: i, j, k, l !<  generic loop iterators
@@ -483,17 +483,17 @@ contains
         else
             adv = 0d0
         end if 
-        gam = 1d0 + 1d0/fluid_pp(1)%gamma
-        pi_inf = fluid_pp(1)%pi_inf*(gam - 1d0)/gam * uratio**2
+        gam_lit = 1d0 + 1d0/fluid_pp(1)%gamma
+        pi_inf = fluid_pp(1)%pi_inf*(gam_lit - 1d0)/gam_lit * uratio**2
         rho = patch_icpp(1)%alpha_rho(1)
         p_mean = patch_icpp(1)%pres*uratio**2
-        c1 = sqrt((gam*(patch_icpp(1)%pres + pi_inf))/(rho*(1d0 - adv)))
+        c1 = sqrt((gam_lit*(patch_icpp(1)%pres + pi_inf))/(rho*(1d0 - adv)))
         mach = 1d0/c1
 
         ! Assign mean profiles
         do j = 0, n + 1
             u_mean(j) = tanh(y_cb(j-1)*xratio)
-            rho_mean(j) = rho/(1d0 + 0.5d0*(gam - 1)*mach**2*(1 - u_mean(j)**2))
+            rho_mean(j) = rho/(1d0 + 0.5d0*(gam_lit - 1)*mach**2*(1 - u_mean(j)**2))
         end do
 
         ! Compute differential operator in y-dir
@@ -535,13 +535,13 @@ contains
             ii = 3; jj = 3; br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = alpha*u_mean(j); 
             ii = 4; jj = 4; br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = alpha*u_mean(j); 
             ii = 4; jj = 5; br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = beta/rho_mean(j); 
-            ii = 5; jj = 2; br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = gam*(p_mean + pi_inf)*alpha; 
-            ii = 5; jj = 4; br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = gam*(p_mean + pi_inf)*beta; 
+            ii = 5; jj = 2; br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = gam_lit*(p_mean + pi_inf)*alpha; 
+            ii = 5; jj = 4; br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = gam_lit*(p_mean + pi_inf)*beta; 
             ii = 5; jj = 5; br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = alpha*u_mean(j); 
             do k = 0, n + 1
                 ii = 1; jj = 3; ci((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + k) = -rho_mean(j)*d(j, k); 
                 ii = 3; jj = 5; ci((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + k) = -d(j, k)/rho_mean(j); 
-                ii = 5; jj = 3; ci((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + k) = -gam*(p_mean + pi_inf)*d(j, k); 
+                ii = 5; jj = 3; ci((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + k) = -gam_lit*(p_mean + pi_inf)*d(j, k); 
             end do
         end do
         ar = br
