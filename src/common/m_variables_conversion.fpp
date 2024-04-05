@@ -119,13 +119,13 @@ contains
         !! @param qv fluid reference energy
         !! @param gamma Specific Heat Ratio
         !! @param pres Pressure to calculate
-    subroutine s_compute_pressure(energy, alf, dyn_p, p_gs, pi_inf, gamma, rho, qv, pres, stress, mom, G)
+    subroutine s_compute_pressure(energy, alf, dyn_p, pi_inf, gamma, rho, qv, pres, stress, mom, G)
         !$acc routine seq
 
         real(kind(0d0)), intent(IN) :: energy, alf
         real(kind(0d0)), intent(IN), optional :: stress, mom, G
 
-        real(kind(0d0)), intent(IN) :: dyn_p, p_gs
+        real(kind(0d0)), intent(IN) :: dyn_p
         real(kind(0d0)), intent(OUT) :: pres
 
         real(kind(0d0)), intent(IN) :: pi_inf, gamma, rho, qv
@@ -140,7 +140,7 @@ contains
         if ((model_eqns /= 4) .and. (bubbles .neqv. .true.)) then
             pres = (energy - dyn_p - pi_inf - qv)/gamma
         else if ((model_eqns /= 4) .and. bubbles) then
-            pres = ((energy - dyn_p - alf*(1d0/0.4d0)*p_gs)/(1.d0 - alf) - pi_inf - qv)/gamma
+            pres = ((energy - dyn_p)/(1.d0 - alf) - pi_inf - qv)/gamma
         else
             pres = (pref + pi_inf)* &
                    (energy/ &
@@ -819,7 +819,7 @@ contains
 
         real(kind(0d0)), dimension(num_fluids) :: alpha_K, alpha_rho_K
         real(kind(0d0)), dimension(2) :: Re_K
-        real(kind(0d0)) :: rho_K, gamma_K, pi_inf_K, qv_K, dyn_pres_K, p_gs_K, fCpbw
+        real(kind(0d0)) :: rho_K, gamma_K, pi_inf_K, qv_K, dyn_pres_K
 
         #:if MFC_CASE_OPTIMIZATION
 #ifndef MFC_SIMULATION
@@ -916,14 +916,9 @@ contains
                         end if
                     end do
 
-                    if (bubbles) then
-                        fCpbw = f_cpbw_KM(R0(1), qK_cons_vf(bub_idx%rs(1))%sf(j, k, l)/qK_cons_vf(n_idx)%sf(j, k, l), qK_cons_vf(bub_idx%vs(1))%sf(j, k, l)/qK_cons_vf(n_idx)%sf(j, k, l), 0d0)
-                        p_gs_K = fCpbw + qK_cons_vf(contxb)%sf(j, k, l)*(qK_cons_vf(bub_idx%vs(1))%sf(j, k, l)/qK_cons_vf(n_idx)%sf(j, k, l))**2
-                    end if
-                    
                     call s_compute_pressure(qK_cons_vf(E_idx)%sf(j, k, l), &
                                             qK_cons_vf(alf_idx)%sf(j, k, l), &
-                                            dyn_pres_K, p_gs_K, pi_inf_K, gamma_K, rho_K, qv_K, pres)
+                                            dyn_pres_K, pi_inf_K, gamma_K, rho_K, qv_K, pres)
 
                     qK_prim_vf(E_idx)%sf(j, k, l) = pres
 
@@ -1021,8 +1016,7 @@ contains
         real(kind(0d0)) :: gamma
         real(kind(0d0)) :: pi_inf
         real(kind(0d0)) :: qv
-        real(kind(0d0)) :: alf
-        real(kind(0d0)) :: dyn_pres, p_gs, fCpbw
+        real(kind(0d0)) :: dyn_pres
         real(kind(0d0)) :: nbub, R3, vftmp, R3tmp
         real(kind(0d0)), dimension(nb) :: Rtmp
         real(kind(0d0)) :: G
@@ -1070,12 +1064,7 @@ contains
                             + qv
                     else if ((model_eqns /= 4) .and. (bubbles)) then
                         ! \tilde{E} = dyn_pres + (1-\alf)(\Gamma p_l + \Pi_inf)
-                        if (bubbles) then
-                            fCpbw = f_cpbw_KM(R0(1), q_prim_vf(bubxb)%sf(j, k, l), q_prim_vf(bubxb+1)%sf(j, k, l), 0d0)
-                            p_gs = fCpbw + q_cons_vf(contxb)%sf(j, k, l)*q_prim_vf(bubxb+1)%sf(j, k, l)**2
-                        end if
-
-                        q_cons_vf(E_idx)%sf(j, k, l) = dyn_pres + alf*(1d0/0.4d0)*p_gs + &
+                        q_cons_vf(E_idx)%sf(j, k, l) = dyn_pres + &
                                                        (1.d0 - q_prim_vf(alf_idx)%sf(j, k, l))* &
                                                        (gamma*q_prim_vf(E_idx)%sf(j, k, l) + pi_inf)
                     else
@@ -1156,24 +1145,6 @@ contains
 #endif
 
     end subroutine s_convert_primitive_to_conservative_variables ! ---------
-
-    function f_cpbw_KM(fR0, fR, fV, fpb)
-        !$acc routine seq
-        real(kind(0d0)), intent(IN) :: fR0, fR, fV, fpb
-        real(kind(0d0)) :: f_cpbw_KM
-
-        if (polytropic) then
-            f_cpbw_KM = Ca*((fR0/fR)**(3.d0*gam)) - Ca + 1d0
-            if (Web /= dflt_real) f_cpbw_KM = f_cpbw_KM + &
-                                              (2.d0/(Web*fR0))*((fR0/fR)**(3.d0*gam))
-        else
-            f_cpbw_KM = fpb
-        end if
-
-        if (Web /= dflt_real) f_cpbw_KM = f_cpbw_KM - 2.d0/(fR*Web)
-        if (Re_inv /= dflt_real) f_cpbw_KM = f_cpbw_KM - 4.d0*Re_inv*fV/fR
-
-    end function f_cpbw_KM
 
     !>  The following subroutine handles the conversion between
         !!      the primitive variables and the Eulerian flux variables.

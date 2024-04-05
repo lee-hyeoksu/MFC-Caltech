@@ -199,7 +199,6 @@ module m_global_parameters
     real(kind(0d0)), dimension(:), allocatable :: Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN
     real(kind(0d0)) :: mul0, ss, gamma_v, mu_v
     real(kind(0d0)) :: gamma_m, gamma_n, mu_n
-    real(kind(0d0)) :: gam
     real(kind(0d0)) :: poly_sigma
     integer :: dist_type !1 = binormal, 2 = lognormal-normal
     integer :: R0_type   !1 = simpson
@@ -503,12 +502,6 @@ contains
                 allocate (bub_idx%rs(nb), bub_idx%vs(nb))
                 allocate (bub_idx%ps(nb), bub_idx%ms(nb))
 
-                if (num_fluids == 1) then
-                    gam = 1.d0/fluid_pp(num_fluids + 1)%gamma + 1.d0
-                else
-                    gam = 1.d0/fluid_pp(num_fluids)%gamma + 1.d0
-                end if
-                
                 if (qbmm) then
                     allocate (bub_idx%moms(nb, nmom))
                     allocate (bub_idx%fullmom(nb, 0:nmom, 0:nmom))

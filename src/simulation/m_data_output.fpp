@@ -1029,7 +1029,6 @@ contains
         real(kind(0d0)) :: gamma
         real(kind(0d0)) :: pi_inf
         real(kind(0d0)) :: qv
-        real(kind(0d0)) :: p_gs
         real(kind(0d0)) :: c
         real(kind(0d0)) :: M00, M10, M01, M20, M11, M02
         real(kind(0d0)) :: varR, varV
@@ -1120,15 +1119,13 @@ contains
                     do s = 1, num_dims
                         vel(s) = q_cons_vf(cont_idx%end + s)%sf(j - 2, k, l)/rho
                     end do
-                    
-                    p_gs = 0d0
 
                     if (hypoelasticity) then
                         call s_compute_pressure( &
                             q_cons_vf(1)%sf(j - 2, k, l), &
                             q_cons_vf(alf_idx)%sf(j - 2, k, l), &
                             0.5d0*(q_cons_vf(2)%sf(j - 2, k, l)**2.d0)/ &
-                            q_cons_vf(1)%sf(j - 2, k, l), p_gs, &
+                            q_cons_vf(1)%sf(j - 2, k, l), &
                             pi_inf, gamma, rho, qv, pres, &
                             q_cons_vf(stress_idx%beg)%sf(j - 2, k, l), &
                             q_cons_vf(mom_idx%beg)%sf(j - 2, k, l), G)
@@ -1137,7 +1134,7 @@ contains
                             q_cons_vf(1)%sf(j - 2, k, l), &
                             q_cons_vf(alf_idx)%sf(j - 2, k, l), &
                             0.5d0*(q_cons_vf(2)%sf(j - 2, k, l)**2.d0)/ &
-                            q_cons_vf(1)%sf(j - 2, k, l), p_gs, &
+                            q_cons_vf(1)%sf(j - 2, k, l), &
                             pi_inf, gamma, rho, qv, pres)
                     end if
 
@@ -1225,13 +1222,11 @@ contains
                             vel(s) = q_cons_vf(cont_idx%end + s)%sf(j - 2, k - 2, l)/rho
                         end do
 
-                        p_gs = 0d0
-
                         call s_compute_pressure( &
                             q_cons_vf(1)%sf(j - 2, k - 2, l), &
                             q_cons_vf(alf_idx)%sf(j - 2, k - 2, l), &
                             0.5d0*(q_cons_vf(2)%sf(j - 2, k - 2, l)**2.d0)/ &
-                            q_cons_vf(1)%sf(j - 2, k - 2, l), p_gs, &
+                            q_cons_vf(1)%sf(j - 2, k - 2, l), &
                             pi_inf, gamma, rho, qv, pres, &
                             q_cons_vf(stress_idx%beg)%sf(j - 2, k - 2, l), &
                             q_cons_vf(mom_idx%beg)%sf(j - 2, k - 2, l), G)
@@ -1304,9 +1299,8 @@ contains
                                 vel(s) = q_cons_vf(cont_idx%end + s)%sf(j - 2, k - 2, l - 2)/rho
                             end do
 
-                            p_gs = 0d0
                             call s_compute_pressure(q_cons_vf(E_idx)%sf(j - 2, k - 2, l - 2), &
-                                                    0d0, 0.5d0*rho*dot_product(vel, vel), p_gs, pi_inf, gamma, rho, qv, pres)
+                                                    0d0, 0.5d0*rho*dot_product(vel, vel), pi_inf, gamma, rho, qv, pres)
 
                             ! Compute mixture sound speed
                             call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, &

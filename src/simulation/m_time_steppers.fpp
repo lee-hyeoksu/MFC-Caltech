@@ -849,37 +849,9 @@ contains
 
         call s_comp_alpha_from_n(q_cons_ts(1)%vf)
 
-        call s_update_energy()
-
         call s_bubble_checker(q_cons_ts(1)%vf)
 
     end subroutine s_adaptive_dt_bubble ! ------------------------------
-
-    subroutine s_update_energy()
-        real(kind(0d0)) :: myRho, myP, myalpha, dyn_p, fCpbw, p_gs
-        integer i, j, k, l
-
-        !$acc parallel loop collapse(3) gang vector default(present)
-        do l = 0, p
-            do k = 0, n
-                do j = 0, m
-                    myP = q_prim_vf(E_idx)%sf(j, k, l)
-                    myalpha = q_cons_ts(1)%vf(alf_idx)%sf(j, k, l)
-                    dyn_p = 0d0
-                    do i = momxb, momxe
-                        dyn_p = dyn_p + 0.5d0*q_cons_ts(1)%vf(i)%sf(j, k, l)* q_prim_vf(i)%sf(j, k, l)
-                    end do
-
-                    fCpbw = f_cpbw_KM(R0(1), q_cons_ts(1)%vf(bub_idx%rs(1))%sf(j, k, l)/q_cons_ts(1)%vf(n_idx)%sf(j, k, l), q_cons_ts(1)%vf(bub_idx%vs(1))%sf(j, k, l)/q_cons_ts(1)%vf(n_idx)%sf(j, k, l), 0d0)
-                    p_gs = fCpbw + q_cons_ts(1)%vf(contxb)%sf(j, k, l)*(q_cons_ts(1)%vf(bub_idx%vs(1))%sf(j, k, l)/q_cons_ts(1)%vf(n_idx)%sf(j, k, l))**2
-
-                    q_cons_ts(1)%vf(E_idx)%sf(j, k, l) = dyn_p + (1d0 - myalpha)*(gammas(1)*myP + pi_infs(1)) + myalpha*(1d0/0.4d0)*p_gs
-
-                end do
-            end do
-        end do
-
-    end subroutine s_update_energy    
 
     !> This subroutine saves the temporary q_prim_vf vector
         !!      into the q_prim_ts vector that is then used in p_main
