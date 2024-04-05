@@ -1629,14 +1629,13 @@ contains
                         cart_z = z_cc(k)
                     end if
 
-                    if (&
-                        ! x_boundary%beg <= x_cc(i) .and. &
-                        ! x_boundary%end >= x_cc(i) .and. &
-                        ! y_boundary%beg <= cart_y .and. &
-                        ! y_boundary%end >= cart_y .and. &
-                        ! z_boundary%beg <= cart_z .and. &
-                        ! z_boundary%end >= cart_z &
-                        ! .and. &
+                    if (x_boundary%beg <= x_cc(i) .and. &
+                        x_boundary%end >= x_cc(i) .and. &
+                        y_boundary%beg <= cart_y .and. &
+                        y_boundary%end >= cart_y .and. &
+                        z_boundary%beg <= cart_z .and. &
+                        z_boundary%end >= cart_z &
+                        .and. &
                         patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) &
                         then
 
