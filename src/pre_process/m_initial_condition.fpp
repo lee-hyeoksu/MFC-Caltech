@@ -401,8 +401,8 @@ contains
         integer :: i, j, k
         real(kind(0d0)) :: xratio, uratio
 
-        xratio = 50e-6/0.002475
-        uratio = (8236./1000.)**0.5d0/3.4343
+        xratio = 1d0 !50e-6/0.002475
+        uratio = 1d0 !(8236./1000.)**0.5d0/3.4343
         
         Lx = (x_domain%end - x_domain%beg)*xratio
         if (p > 0) then
@@ -484,8 +484,8 @@ contains
         integer :: i, j, k, l !<  generic loop iterators
         integer :: ii, jj !< block matrix indices
 
-        xratio = 50e-6/0.002475
-        uratio = (8236./1000.)**0.5d0/3.4343
+        xratio = 1d0 !50e-6/0.002475
+        uratio = 1d0 !(8236./1000.)**0.5d0/3.4343
 
         ! Set fluid flow properties
         if (bubbles) then
@@ -725,7 +725,7 @@ contains
         integer i, j, k
         real(kind(0d0)) :: xratio
 
-        xratio = 50e-6/0.002475
+        xratio = 1d0 !50e-6/0.002475
 
         ! Find the most unstable eigenvalue and corresponding eigenvector
         k = 0
@@ -839,7 +839,7 @@ contains
         integer j
         real(kind(0d0)) :: xratio
 
-        xratio = 50e-6/0.002475
+        xratio = 1d0 !50e-6/0.002475
 
         a = alpha*(x_domain%end-x_domain%beg)*xratio/(2*pi)
         b =  beta*(z_domain%end-z_domain%beg)*xratio/(2*pi)

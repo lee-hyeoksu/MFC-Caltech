@@ -17,7 +17,7 @@
 
     "files.associations": {
         "*.f90": "FortranFreeForm",
-        "*.fpp": "FortranFreeForm"
+        "*.fpp": "fortran-modern"
     },
 
     "fortran.preferredCase":       "lowercase",
