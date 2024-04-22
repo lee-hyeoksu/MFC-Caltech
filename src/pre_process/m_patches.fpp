@@ -928,12 +928,11 @@ contains
         do j = 0, n
             do i = 0, m
                 if (.not. ib) then
-                    if (&
-                        ! x_boundary%beg <= x_cc(i) .and. &
-                        ! x_boundary%end >= x_cc(i) .and. &
-                        ! y_boundary%beg <= y_cc(j) .and. &
-                        ! y_boundary%end >= y_cc(j) &
-                        ! .and. &
+                    if (x_boundary%beg <= x_cc(i) .and. &
+                        x_boundary%end >= x_cc(i) .and. &
+                        y_boundary%beg <= y_cc(j) .and. &
+                        y_boundary%end >= y_cc(j) &
+                        .and. &
                         patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, 0))) &
                         then
 
