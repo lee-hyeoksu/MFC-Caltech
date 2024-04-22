@@ -1541,9 +1541,9 @@ contains
                                     end do
                                 else
                                     rho_L = qL_prim_rs${XYZ}$_vf(j, k, l, 1)
-                                    gamma_L = gammas(1)!*(1d0 - alpha_L(1))
-                                    pi_inf_L = pi_infs(1)!*(1d0 - alpha_L(1))
-                                    qv_L = qvs(1)!*(1d0 - alpha_L(1))
+                                    gamma_L = gammas(1)
+                                    pi_inf_L = pi_infs(1)
+                                    qv_L = qvs(1)
                                 end if
 
                                 rho_R = 0d0
@@ -1569,9 +1569,9 @@ contains
                                     end do
                                 else
                                     rho_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, 1)
-                                    gamma_R = gammas(1)!*(1d0 - alpha_R(1))
-                                    pi_inf_R = pi_infs(1)!*(1d0 - alpha_R(1))
-                                    qv_R = qvs(1)!*(1d0 - alpha_R(1))
+                                    gamma_R = gammas(1)
+                                    pi_inf_R = pi_infs(1)
+                                    qv_R = qvs(1)
                                 end if
 
                                 if (any(Re_size > 0)) then

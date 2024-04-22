@@ -267,23 +267,7 @@ contains
             @:ALLOCATE(q_prim_vf(n_idx)%sf(ix_t%beg:ix_t%end, &
                 iy_t%beg:iy_t%end, &
                 iz_t%beg:iz_t%end))
-        end if
-
-        if (hypoelasticity) then
-
-            do i = stress_idx%beg, stress_idx%end
-                @:ALLOCATE(q_prim_vf(i)%sf(ix_t%beg:ix_t%end, &
-                    iy_t%beg:iy_t%end, &
-                    iz_t%beg:iz_t%end))
-            end do
-        end if
-
-        if (model_eqns == 3) then
-            do i = internalEnergies_idx%beg, internalEnergies_idx%end
-                @:ALLOCATE(q_prim_vf(i)%sf(ix_t%beg:ix_t%end, &
-                    iy_t%beg:iy_t%end, &
-                    iz_t%beg:iz_t%end))
-            end do
+            @:ACC_SETUP_SFs(q_prim_vf(n_idx))
         end if
 
         ! Allocating the cell-average RHS variables
