@@ -38,6 +38,28 @@ module m_time_steppers
 
     implicit none
 
+#ifdef CRAY_ACC_WAR
+    @:CRAY_DECLARE_GLOBAL(type(vector_field), dimension(:), q_cons_ts)
+    !! Cell-average conservative variables at each time-stage (TS)
+
+    @:CRAY_DECLARE_GLOBAL(type(scalar_field), dimension(:), q_prim_vf)
+    !! Cell-average primitive variables at the current time-stage
+
+    @:CRAY_DECLARE_GLOBAL(type(scalar_field), dimension(:), rhs_vf)
+    !! Cell-average RHS variables at the current time-stage
+
+    @:CRAY_DECLARE_GLOBAL(type(vector_field), dimension(:), q_prim_ts)
+    !! Cell-average primitive variables at consecutive TIMESTEPS
+
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :, :), rhs_pb)
+
+    @:CRAY_DECLARE_GLOBAL(real(kind(0d0)), dimension(:, :, :, :, :), rhs_mv)
+
+    integer, private :: num_ts !<
+    !! Number of time stages in the time-stepping scheme
+
+    !$acc declare link(q_cons_ts,q_prim_vf,rhs_vf,q_prim_ts, rhs_mv, rhs_pb)
+#else
     type(vector_field), allocatable, dimension(:) :: q_cons_ts !<
     !! Cell-average conservative variables at each time-stage (TS)
 
@@ -58,6 +80,7 @@ module m_time_steppers
     !! Number of time stages in the time-stepping scheme
 
     !$acc declare create(q_cons_ts,q_prim_vf,rhs_vf,q_prim_ts, rhs_mv, rhs_pb)
+#endif
 
 contains
 
@@ -95,7 +118,7 @@ contains
         end if
 
         ! Allocating the cell-average conservative variables
-        @:ALLOCATE(q_cons_ts(1:num_ts))
+        @:ALLOCATE_GLOBAL(q_cons_ts(1:num_ts))
 
         do i = 1, num_ts
             @:ALLOCATE(q_cons_ts(i)%vf(1:sys_size))
@@ -107,11 +130,12 @@ contains
                     iy_t%beg:iy_t%end, &
                     iz_t%beg:iz_t%end))
             end do
+            @:ACC_SETUP_VFs(q_cons_ts(i))
         end do
 
         ! Allocating the cell-average primitive ts variables
         if (probe_wrt) then
-            @:ALLOCATE(q_prim_ts(0:3))
+            @:ALLOCATE_GLOBAL(q_prim_ts(0:3))
 
             do i = 0, 3
                 @:ALLOCATE(q_prim_ts(i)%vf(1:sys_size))
@@ -124,15 +148,20 @@ contains
                         iz_t%beg:iz_t%end))
                 end do
             end do
+
+            do i = 0, 3
+                @:ACC_SETUP_VFs(q_prim_ts(i))
+            end do
         end if
 
         ! Allocating the cell-average primitive variables
-        @:ALLOCATE(q_prim_vf(1:sys_size))
+        @:ALLOCATE_GLOBAL(q_prim_vf(1:sys_size))
 
         do i = 1, adv_idx%end
             @:ALLOCATE(q_prim_vf(i)%sf(ix_t%beg:ix_t%end, &
                 iy_t%beg:iy_t%end, &
                 iz_t%beg:iz_t%end))
+            @:ACC_SETUP_SFs(q_prim_vf(i))
         end do
 
         if (bubbles) then
@@ -140,53 +169,96 @@ contains
                 @:ALLOCATE(q_prim_vf(i)%sf(ix_t%beg:ix_t%end, &
                     iy_t%beg:iy_t%end, &
                     iz_t%beg:iz_t%end))
+                @:ACC_SETUP_SFs(q_prim_vf(i))
+            end do
+            if (adv_n) then
+                @:ALLOCATE(q_prim_vf(n_idx)%sf(ix_t%beg:ix_t%end, &
+                    iy_t%beg:iy_t%end, &
+                    iz_t%beg:iz_t%end))
+                @:ACC_SETUP_SFs(q_prim_vf(n_idx))
+            end if
+        end if
+
+        if (hypoelasticity) then
+
+            do i = stress_idx%beg, stress_idx%end
+                @:ALLOCATE(q_prim_vf(i)%sf(ix_t%beg:ix_t%end, &
+                    iy_t%beg:iy_t%end, &
+                    iz_t%beg:iz_t%end))
+                @:ACC_SETUP_SFs(q_prim_vf(i))
             end do
         end if
 
-        @:ALLOCATE(pb_ts(1:2))
+        if (model_eqns == 3) then
+            do i = internalEnergies_idx%beg, internalEnergies_idx%end
+                @:ALLOCATE(q_prim_vf(i)%sf(ix_t%beg:ix_t%end, &
+                    iy_t%beg:iy_t%end, &
+                    iz_t%beg:iz_t%end))
+                @:ACC_SETUP_SFs(q_prim_vf(i))
+            end do
+        end if
+
+        @:ALLOCATE_GLOBAL(pb_ts(1:2))
         !Initialize bubble variables pb and mv at all quadrature nodes for all R0 bins
         if (qbmm .and. (.not. polytropic)) then
             @:ALLOCATE(pb_ts(1)%sf(ix_t%beg:ix_t%end, &
                 iy_t%beg:iy_t%end, &
                 iz_t%beg:iz_t%end, 1:nnode, 1:nb))
+            @:ACC_SETUP_SFs(pb_ts(1))
+
             @:ALLOCATE(pb_ts(2)%sf(ix_t%beg:ix_t%end, &
                 iy_t%beg:iy_t%end, &
                 iz_t%beg:iz_t%end, 1:nnode, 1:nb))
-            @:ALLOCATE(rhs_pb(ix_t%beg:ix_t%end, &
+            @:ACC_SETUP_SFs(pb_ts(2))
+
+            @:ALLOCATE_GLOBAL(rhs_pb(ix_t%beg:ix_t%end, &
                 iy_t%beg:iy_t%end, &
                 iz_t%beg:iz_t%end, 1:nnode, 1:nb))
         else if (qbmm .and. polytropic) then
             @:ALLOCATE(pb_ts(1)%sf(ix_t%beg:ix_t%beg + 1, &
                 iy_t%beg:iy_t%beg + 1, &
                 iz_t%beg:iz_t%beg + 1, 1:nnode, 1:nb))
+            @:ACC_SETUP_SFs(pb_ts(1))
+
             @:ALLOCATE(pb_ts(2)%sf(ix_t%beg:ix_t%beg + 1, &
                 iy_t%beg:iy_t%beg + 1, &
                 iz_t%beg:iz_t%beg + 1, 1:nnode, 1:nb))
-            @:ALLOCATE(rhs_pb(ix_t%beg:ix_t%beg + 1, &
+            @:ACC_SETUP_SFs(pb_ts(2))
+
+            @:ALLOCATE_GLOBAL(rhs_pb(ix_t%beg:ix_t%beg + 1, &
                 iy_t%beg:iy_t%beg + 1, &
                 iz_t%beg:iz_t%beg + 1, 1:nnode, 1:nb))
         end if
 
-        @:ALLOCATE(mv_ts(1:2))
+        @:ALLOCATE_GLOBAL(mv_ts(1:2))
 
         if (qbmm .and. (.not. polytropic)) then
             @:ALLOCATE(mv_ts(1)%sf(ix_t%beg:ix_t%end, &
                 iy_t%beg:iy_t%end, &
                 iz_t%beg:iz_t%end, 1:nnode, 1:nb))
+            @:ACC_SETUP_SFs(mv_ts(1))
+
             @:ALLOCATE(mv_ts(2)%sf(ix_t%beg:ix_t%end, &
                 iy_t%beg:iy_t%end, &
                 iz_t%beg:iz_t%end, 1:nnode, 1:nb))
-            @:ALLOCATE(rhs_mv(ix_t%beg:ix_t%end, &
+            @:ACC_SETUP_SFs(mv_ts(2))
+
+            @:ALLOCATE_GLOBAL(rhs_mv(ix_t%beg:ix_t%end, &
                 iy_t%beg:iy_t%end, &
                 iz_t%beg:iz_t%end, 1:nnode, 1:nb))
+
         else if (qbmm .and. polytropic) then
             @:ALLOCATE(mv_ts(1)%sf(ix_t%beg:ix_t%beg + 1, &
                 iy_t%beg:iy_t%beg + 1, &
                 iz_t%beg:iz_t%beg + 1, 1:nnode, 1:nb))
+            @:ACC_SETUP_SFs(mv_ts(1))
+
             @:ALLOCATE(mv_ts(2)%sf(ix_t%beg:ix_t%beg + 1, &
                 iy_t%beg:iy_t%beg + 1, &
                 iz_t%beg:iz_t%beg + 1, 1:nnode, 1:nb))
-            @:ALLOCATE(rhs_mv(ix_t%beg:ix_t%beg + 1, &
+            @:ACC_SETUP_SFs(mv_ts(2))
+
+            @:ALLOCATE_GLOBAL(rhs_mv(ix_t%beg:ix_t%beg + 1, &
                 iy_t%beg:iy_t%beg + 1, &
                 iz_t%beg:iz_t%beg + 1, 1:nnode, 1:nb))
         end if
@@ -215,10 +287,11 @@ contains
         end if
 
         ! Allocating the cell-average RHS variables
-        @:ALLOCATE(rhs_vf(1:sys_size))
+        @:ALLOCATE_GLOBAL(rhs_vf(1:sys_size))
 
         do i = 1, sys_size
             @:ALLOCATE(rhs_vf(i)%sf(0:m, 0:n, 0:p))
+            @:ACC_SETUP_SFs(rhs_vf(i))
         end do
 
         ! Opening and writing the header of the run-time information file
@@ -318,8 +391,6 @@ contains
         if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
 
         if (adv_n) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
-
-        if (bubbles) call s_bubble_checker(q_cons_ts(1)%vf)
 
         if (ib) then
             if (qbmm .and. .not. polytropic) then
@@ -428,8 +499,6 @@ contains
 
         if (adv_n) call s_comp_alpha_from_n(q_cons_ts(2)%vf)
 
-        if (bubbles) call s_bubble_checker(q_cons_ts(2)%vf)
-
         if (ib) then
             if (qbmm .and. .not. polytropic) then
                 call s_ibm_correct_state(q_cons_ts(2)%vf, q_prim_vf, pb_ts(2)%sf, mv_ts(2)%sf)
@@ -500,8 +569,6 @@ contains
         end if
 
         if (adv_n) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
-
-        if (bubbles) call s_bubble_checker(q_cons_ts(1)%vf)
 
         if (ib) then
             if (qbmm .and. .not. polytropic) then
@@ -612,8 +679,6 @@ contains
 
         if (adv_n) call s_comp_alpha_from_n(q_cons_ts(2)%vf)
 
-        if (bubbles) call s_bubble_checker(q_cons_ts(2)%vf)
-
         if (ib) then
             if (qbmm .and. .not. polytropic) then
                 call s_ibm_correct_state(q_cons_ts(2)%vf, q_prim_vf, pb_ts(2)%sf, mv_ts(2)%sf)
@@ -686,8 +751,6 @@ contains
 
         if (adv_n) call s_comp_alpha_from_n(q_cons_ts(2)%vf)
 
-        if (bubbles) call s_bubble_checker(q_cons_ts(2)%vf)
-
         if (ib) then
             if (qbmm .and. .not. polytropic) then
                 call s_ibm_correct_state(q_cons_ts(2)%vf, q_prim_vf, pb_ts(2)%sf, mv_ts(2)%sf)
@@ -758,8 +821,6 @@ contains
         end if
 
         if (adv_n) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
-
-        if (bubbles) call s_bubble_checker(q_cons_ts(1)%vf)
 
         if (ib) then
             if (qbmm .and. .not. polytropic) then
@@ -849,8 +910,6 @@ contains
 
         call s_comp_alpha_from_n(q_cons_ts(1)%vf)
 
-        call s_bubble_checker(q_cons_ts(1)%vf)
-
     end subroutine s_adaptive_dt_bubble ! ------------------------------
 
     !> This subroutine saves the temporary q_prim_vf vector
@@ -909,7 +968,7 @@ contains
 
         end do
 
-        @:DEALLOCATE(q_cons_ts)
+        @:DEALLOCATE_GLOBAL(q_cons_ts)
 
         ! Deallocating the cell-average primitive ts variables
         if (probe_wrt) then
@@ -919,7 +978,7 @@ contains
                 end do
                 @:DEALLOCATE(q_prim_ts(i)%vf)
             end do
-            @:DEALLOCATE(q_prim_ts)
+            @:DEALLOCATE_GLOBAL(q_prim_ts)
         end if
 
         ! Deallocating the cell-average primitive variables
@@ -945,14 +1004,14 @@ contains
             end do
         end if
 
-        @:DEALLOCATE(q_prim_vf)
+        @:DEALLOCATE_GLOBAL(q_prim_vf)
 
         ! Deallocating the cell-average RHS variables
         do i = 1, sys_size
             @:DEALLOCATE(rhs_vf(i)%sf)
         end do
 
-        @:DEALLOCATE(rhs_vf)
+        @:DEALLOCATE_GLOBAL(rhs_vf)
 
         ! Writing the footer of and closing the run-time information file
         if (proc_rank == 0 .and. run_time_info) then

@@ -137,20 +137,6 @@ contains
                     print *, 'Processing patch', i
                 end if
 
-                !> IB Patches
-                !> @{
-                ! Spherical patch
-                if (patch_ib(i)%geometry == 8) then
-                    call s_sphere(i, ib_markers%sf, q_prim_vf, .true.)
-                    ! Cylindrical patch
-                elseif (patch_ib(i)%geometry == 10) then
-                    call s_cylinder(i, ib_markers%sf, q_prim_vf, .true.)
-
-                elseif (patch_ib(i)%geometry == 11) then
-                    call s_3D_airfoil(i, ib_markers%sf, q_prim_vf, .true.)
-                end if
-                !> @}
-
                 !> ICPP Patches
                 !> @{
                 ! Spherical patch
@@ -194,6 +180,26 @@ contains
             end do
             !> @}
 
+            !> IB Patches
+            !> @{
+            ! Spherical patch
+            do i = 1, num_ibs
+                if (proc_rank == 0) then
+                    print *, 'Processing 3D ib patch ', i
+                end if
+
+                if (patch_ib(i)%geometry == 8) then
+                    call s_sphere(i, ib_markers%sf, q_prim_vf, .true.)
+                    ! Cylindrical patch
+                elseif (patch_ib(i)%geometry == 10) then
+                    call s_cylinder(i, ib_markers%sf, q_prim_vf, .true.)
+
+                elseif (patch_ib(i)%geometry == 11) then
+                    call s_3D_airfoil(i, ib_markers%sf, q_prim_vf, .true.)
+                end if
+            end do
+            !> @}
+
             ! ==================================================================
 
             ! 2D Patch Geometries ==============================================
@@ -204,21 +210,6 @@ contains
                 if (proc_rank == 0) then
                     print *, 'Processing patch', i
                 end if
-
-                !> IB Patches
-                !> @{
-                ! Circular patch
-                if (patch_ib(i)%geometry == 2) then
-                    call s_circle(i, ib_markers%sf, q_prim_vf, .true.)
-
-                    ! Rectangular patch
-                elseif (patch_ib(i)%geometry == 3) then
-                    call s_rectangle(i, ib_markers%sf, q_prim_vf, .true.)
-
-                elseif (patch_ib(i)%geometry == 4) then
-                    call s_airfoil(i, ib_markers%sf, q_prim_vf, .true.)
-                end if
-                !> @}
 
                 !> ICPP Patches
                 !> @{
@@ -266,6 +257,25 @@ contains
                 end if
                 !> @}
             end do
+
+            !> IB Patches
+            !> @{
+            do i = 1, num_ibs
+                if (proc_rank == 0) then
+                    print *, 'Processing 2D ib patch ', i
+                end if
+                if (patch_ib(i)%geometry == 2) then
+                    call s_circle(i, ib_markers%sf, q_prim_vf, .true.)
+
+                    ! Rectangular patch
+                elseif (patch_ib(i)%geometry == 3) then
+                    call s_rectangle(i, ib_markers%sf, q_prim_vf, .true.)
+
+                elseif (patch_ib(i)%geometry == 4) then
+                    call s_airfoil(i, ib_markers%sf, q_prim_vf, .true.)
+                end if
+            end do
+            !> @}
 
             ! ==================================================================
 
@@ -496,6 +506,8 @@ contains
             rho_mean(j) = rho/(1d0 + 0.5d0*(gam - 1)*mach**2*(1 - u_mean(j)**2))
         end do
 
+        p_mean = patch_icpp(1)%pres
+
         ! Compute differential operator in y-dir
         ! based on 2nd order central difference
         d = 0d0
@@ -544,8 +556,21 @@ contains
                 ii = 5; jj = 3; ci((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + k) = -gam*(p_mean + pi_inf)*d(j, k); 
             end do
         end do
-        ar = br
-        ai = bi + ci
+
+        ! ar = br and ai = bi+ci
+        ! applying slip-wall boundary condition
+        ar(0:4*(n + 1) - 1, 0:4*(n + 1) - 1) = br(0:4*(n + 1) - 1, 0:4*(n + 1) - 1)
+        ar(0:4*(n + 1) - 1, 4*(n + 1):5*(n + 1) - 3) = br(0:4*(n + 1) - 1, 4*(n + 1) + 1:5*(n + 1) - 2)
+        ar(4*(n + 1):5*(n + 1) - 3, 0:4*(n + 1) - 1) = br(4*(n + 1) + 1:5*(n + 1) - 2, 0:4*(n + 1) - 1)
+        ar(4*(n + 1):5*(n + 1) - 3, 4*(n + 1):5*(n + 1) - 3) = br(4*(n + 1) + 1:5*(n + 1) - 2, 4*(n + 1) + 1:5*(n + 1) - 2)
+        ai(0:4*(n + 1) - 1, 0:4*(n + 1) - 1) = bi(0:4*(n + 1) - 1, 0:4*(n + 1) - 1) &
+                                               + ci(0:4*(n + 1) - 1, 0:4*(n + 1) - 1)
+        ai(0:4*(n + 1) - 1, 4*(n + 1):5*(n + 1) - 3) = bi(0:4*(n + 1) - 1, 4*(n + 1) + 1:5*(n + 1) - 2) &
+                                                       + ci(0:4*(n + 1) - 1, 4*(n + 1) + 1:5*(n + 1) - 2)
+        ai(4*(n + 1):5*(n + 1) - 3, 0:4*(n + 1) - 1) = bi(4*(n + 1) + 1:5*(n + 1) - 2, 0:4*(n + 1) - 1) &
+                                                       + ci(4*(n + 1) + 1:5*(n + 1) - 2, 0:4*(n + 1) - 1)
+        ai(4*(n + 1):5*(n + 1) - 3, 4*(n + 1):5*(n + 1) - 3) = bi(4*(n + 1) + 1:5*(n + 1) - 2, 4*(n + 1) + 1:5*(n + 1) - 2) &
+                                                               + ci(4*(n + 1) + 1:5*(n + 1) - 2, 4*(n + 1) + 1:5*(n + 1) - 2)
 
         ! Nonreflecting subsonic buffer BC
         ! Condition 1: v = 0 at BC
