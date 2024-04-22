@@ -927,22 +927,22 @@ contains
         ! variables of the current patch are assigned to this cell.
         do j = 0, n
             do i = 0, m
-                if (.not. ib) then
-                    if (x_boundary%beg <= x_cc(i) .and. &
-                        x_boundary%end >= x_cc(i) .and. &
-                        y_boundary%beg <= y_cc(j) .and. &
-                        y_boundary%end >= y_cc(j) &
-                        .and. &
-                        patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, 0))) &
-                        then
+                if ( &
+                !     x_boundary%beg <= x_cc(i) .and. &
+                !     x_boundary%end >= x_cc(i) .and. &
+                !     y_boundary%beg <= y_cc(j) .and. &
+                !     y_boundary%end >= y_cc(j) &
+                !     .and. &
+                    patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, 0))) &
+                    then
 
                         call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
                                                                 eta, q_prim_vf, patch_id_fp)
 
                         @:analytical()
 
-                        call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
-                                                                eta, q_prim_vf, patch_id_fp)
+                        ! call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
+                        !                                         eta, q_prim_vf, patch_id_fp)
 
                         if ((q_prim_vf(1)%sf(i, j, 0) < 1.e-10) .and. (model_eqns == 4)) then
                             !zero density, reassign according to Tait EOS

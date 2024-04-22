@@ -1470,6 +1470,7 @@ contains
                 end if
             else
                 if (riemann_solver == 1) then
+
                     !$acc parallel loop collapse(4) gang vector default(present)
                     do j = advxb, advxe
                         do k = 0, p

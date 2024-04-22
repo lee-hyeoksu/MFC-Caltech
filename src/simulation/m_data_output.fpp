@@ -349,7 +349,9 @@ contains
                                              /maxval(1d0/Re)
 
                         end if
-
+                        if (icfl_sf(j, k, l) > 1d0) then
+                            print *, j, k, l, icfl_sf(j, k, l), vel(1), vel(2), c, alpha(1)
+                        end if
                     else
                         !1D
                         icfl_sf(j, k, l) = (dt/dx(j))*(abs(vel(1)) + c)

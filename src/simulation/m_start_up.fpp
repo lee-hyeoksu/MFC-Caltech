@@ -151,7 +151,7 @@ contains
             relax, relax_model, &
             palpha_eps, ptgalpha_eps, &
             R0_type, file_per_process, &
-            pi_fac, adv_n, adap_dt
+            pi_fac, adv_n, adap_dt, apc
 
         ! Checking that an input file has been provided by the user. If it
         ! has, then the input file is read in, otherwise, simulation exits.
@@ -1061,7 +1061,7 @@ contains
         logical, intent(INOUT) :: file_exists
         real(kind(0d0)), intent(INOUT) :: start, finish
         integer, intent(INOUT) :: nt
-
+        real(kind(0d0)) :: dyn_p
         integer :: i, j, k, l
 
         if (proc_rank == 0 .and. mod(t_step - t_step_start, t_step_print) == 0) then
@@ -1091,7 +1091,7 @@ contains
         elseif (time_stepper == 2) then
             call s_2nd_order_tvd_rk(t_step, time_avg)
         elseif (time_stepper == 3 .and. (.not. adap_dt)) then
-            call s_3rd_order_tvd_rk(t_step, time_avg, dt)
+            call s_3rd_order_tvd_rk(t_step, time_avg)
         elseif (time_stepper == 3 .and. adap_dt) then
             call s_strang_splitting(t_step, time_avg)
         end if
