@@ -424,17 +424,17 @@ contains
 
         if (p > 0) then
             ! Compute 3D waves with phase shifts.
-            call s_instability_wave(2*pi*4.0/Lx, 2*pi*4.0/Lz, tr, ti, wave_tmp, 2*pi*11d0/31d0)
+            call s_instability_wave(2*pi*4.0/Lx, 2*pi*4.0/Lz, tr, ti, wave_tmp, 2*pi*11d0/31d0) !2*pi*19d0/37d0) !2*pi*13d0/43d0) !2*pi*17d0/53d0) !2*pi*7d0/61d0) !2*pi*11d0/31d0)
             wave2 = wave2 + wave_tmp
-            call s_instability_wave(2*pi*2.0/Lx, 2*pi*2.0/Lz, tr, ti, wave_tmp, 2*pi*13d0/31d0)
+            call s_instability_wave(2*pi*2.0/Lx, 2*pi*2.0/Lz, tr, ti, wave_tmp, 2*pi*13d0/31d0) !2*pi*31d0/37d0) !2*pi*11d0/43d0) !2*pi*19d0/53d0) !2*pi*11d0/61d0) !2*pi*13d0/31d0)
             wave2 = wave2 + wave_tmp
-            call s_instability_wave(2*pi*1.0/Lx, 2*pi*1.0/Lz, tr, ti, wave_tmp, 2*pi*17d0/31d0)
+            call s_instability_wave(2*pi*1.0/Lx, 2*pi*1.0/Lz, tr, ti, wave_tmp, 2*pi*17d0/31d0) !2*pi*29d0/37d0) !2*pi*39d0/43d0) !2*pi*31d0/53d0) !2*pi*19d0/61d0) !2*pi*17d0/31d0)
             wave2 = wave2 + wave_tmp
-            call s_instability_wave(2*pi*4.0/Lx, -2*pi*4.0/Lz, tr, ti, wave_tmp, 2*pi*19d0/31d0)
+            call s_instability_wave(2*pi*4.0/Lx, -2*pi*4.0/Lz, tr, ti, wave_tmp, 2*pi*19d0/31d0) !2*pi*3d0/37d0) !2*pi*29d0/43d0) !2*pi*47d0/53d0) !2*pi*41d0/61d0) !2*pi*19d0/31d0)
             wave2 = wave2 + wave_tmp
-            call s_instability_wave(2*pi*2.0/Lx, -2*pi*2.0/Lz, tr, ti, wave_tmp, 2*pi*23d0/31d0)
+            call s_instability_wave(2*pi*2.0/Lx, -2*pi*2.0/Lz, tr, ti, wave_tmp, 2*pi*23d0/31d0) !2*pi*23d0/37d0) !2*pi*23d0/43d0) !2*pi*29d0/53d0) !2*pi*53d0/61d0) !2*pi*23d0/31d0)
             wave2 = wave2 + wave_tmp
-            call s_instability_wave(2*pi*1.0/Lx, -2*pi*1.0/Lz, tr, ti, wave_tmp, 2*pi*29d0/31d0)
+            call s_instability_wave(2*pi*1.0/Lx, -2*pi*1.0/Lz, tr, ti, wave_tmp, 2*pi*29d0/31d0) !2*pi*11d0/37d0) !2*pi*19d0/43d0) !2*pi*3d0/53d0) !2*pi*59d0/61d0) !2*pi*29d0/31d0)
             wave2 = wave2 + wave_tmp
             wave = wave + 0.15*wave2
         end if
@@ -503,10 +503,8 @@ contains
         ! Assign mean profiles
         do j = 0, n + 1
             u_mean(j) = tanh(y_cb(j-1)*xratio)
-            rho_mean(j) = rho/(1d0 + 0.5d0*(gam - 1)*mach**2*(1 - u_mean(j)**2))
+            rho_mean(j) = rho/(1d0 + 0.5d0*(gam - 1d0)*mach**2*(1d0 - u_mean(j)**2))
         end do
-
-        p_mean = patch_icpp(1)%pres
 
         ! Compute differential operator in y-dir
         ! based on 2nd order central difference
@@ -541,39 +539,37 @@ contains
             ii = 1; jj = 2; br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = alpha*rho_mean(j); 
             ii = 1; jj = 3; bi((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = -drho_mean(j); 
             ii = 1; jj = 4; br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = beta*rho_mean(j); 
+
             ii = 2; jj = 2; br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = alpha*u_mean(j); 
             ii = 2; jj = 3; bi((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = -du_mean(j); 
             ii = 2; jj = 5; br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = alpha/rho_mean(j); 
+
             ii = 3; jj = 3; br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = alpha*u_mean(j); 
+
             ii = 4; jj = 4; br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = alpha*u_mean(j); 
             ii = 4; jj = 5; br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = beta/rho_mean(j); 
+
             ii = 5; jj = 2; br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = gam*(p_mean + pi_inf)*alpha; 
             ii = 5; jj = 4; br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = gam*(p_mean + pi_inf)*beta; 
             ii = 5; jj = 5; br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = alpha*u_mean(j); 
+
+            ! if (bubbles) then
+            !     ii = 6; jj = 2; br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = alpha*nbub; 
+            !     ii = 6; jj = 4; br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = beta*nbub;
+            !     ii = 6; jj = 6; br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = alpha*u_mean(j);
+            ! end if
             do k = 0, n + 1
                 ii = 1; jj = 3; ci((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + k) = -rho_mean(j)*d(j, k); 
                 ii = 3; jj = 5; ci((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + k) = -d(j, k)/rho_mean(j); 
                 ii = 5; jj = 3; ci((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + k) = -gam*(p_mean + pi_inf)*d(j, k); 
+                ! if (bubbles) then
+                !     ii = 6; jj = 3; ci((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + k) = -nbub*d(j, k); 
+                ! end if
             end do
         end do
-
-        ! ar = br and ai = bi+ci
-        ! ! applying slip-wall boundary condition
-        ! ar(0:4*(n + 1) - 1, 0:4*(n + 1) - 1) = br(0:4*(n + 1) - 1, 0:4*(n + 1) - 1)
-        ! ar(0:4*(n + 1) - 1, 4*(n + 1):5*(n + 1) - 3) = br(0:4*(n + 1) - 1, 4*(n + 1) + 1:5*(n + 1) - 2)
-        ! ar(4*(n + 1):5*(n + 1) - 3, 0:4*(n + 1) - 1) = br(4*(n + 1) + 1:5*(n + 1) - 2, 0:4*(n + 1) - 1)
-        ! ar(4*(n + 1):5*(n + 1) - 3, 4*(n + 1):5*(n + 1) - 3) = br(4*(n + 1) + 1:5*(n + 1) - 2, 4*(n + 1) + 1:5*(n + 1) - 2)
-        ! ai(0:4*(n + 1) - 1, 0:4*(n + 1) - 1) = bi(0:4*(n + 1) - 1, 0:4*(n + 1) - 1) &
-        !                                        + ci(0:4*(n + 1) - 1, 0:4*(n + 1) - 1)
-        ! ai(0:4*(n + 1) - 1, 4*(n + 1):5*(n + 1) - 3) = bi(0:4*(n + 1) - 1, 4*(n + 1) + 1:5*(n + 1) - 2) &
-        !                                                + ci(0:4*(n + 1) - 1, 4*(n + 1) + 1:5*(n + 1) - 2)
-        ! ai(4*(n + 1):5*(n + 1) - 3, 0:4*(n + 1) - 1) = bi(4*(n + 1) + 1:5*(n + 1) - 2, 0:4*(n + 1) - 1) &
-        !                                                + ci(4*(n + 1) + 1:5*(n + 1) - 2, 0:4*(n + 1) - 1)
-        ! ai(4*(n + 1):5*(n + 1) - 3, 4*(n + 1):5*(n + 1) - 3) = bi(4*(n + 1) + 1:5*(n + 1) - 2, 4*(n + 1) + 1:5*(n + 1) - 2) &
-        !                                                        + ci(4*(n + 1) + 1:5*(n + 1) - 2, 4*(n + 1) + 1:5*(n + 1) - 2)
         ar = br
         ai = bi + ci
-        
+
         ! Nonreflecting subsonic buffer BC
         ! Condition 1: v = 0 at BC
 
