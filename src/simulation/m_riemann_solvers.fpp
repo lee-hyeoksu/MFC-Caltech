@@ -1973,7 +1973,7 @@ contains
                     !$acc end parallel loop
                 else
                     !$acc parallel loop collapse(3) gang vector default(present) private(vel_L, vel_R, Re_L, Re_R, &
-                    !$acc rho_avg, h_avg, gamma_avg, alpha_L, alpha_R, s_L, s_R, s_S, vel_avg_rms) copyin(is1,is2,is3)
+                    !$acc rho_avg, h_avg, gamma_avg, alpha_L, alpha_R, s_L, s_R, s_S, vel_avg_rms, vel_L_sum, vel_R_sum, pcorr) copyin(is1,is2,is3)
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
@@ -2158,6 +2158,23 @@ contains
                                 xi_M = (5d-1 + sign(5d-1, s_S))
                                 xi_P = (5d-1 - sign(5d-1, s_S))
 
+                                ! Anti-dissipation pressure correction (APC) term
+                                if (apc) then
+                                    vel_L_sum = 0d0; vel_R_sum = 0d0
+                                    !$acc loop seq
+                                    do i = 1, num_dims
+                                        vel_L_sum = vel_L_sum + vel_L(i)**2
+                                        vel_R_sum = vel_R_sum + vel_R(i)**2
+                                    end do
+                                    pcorr = rho_L*rho_R* &
+                                            (s_L-vel_L(idx1))*(s_R-vel_R(idx1))*(vel_R(idx1)-vel_L(idx1))/ &
+                                            (rho_R*(s_R-vel_R(idx1))-rho_L*(s_L-vel_L(idx1)))* &
+                                            (min(1d0,max(vel_L_sum**0.5d0/c_L,vel_R_sum**0.5d0/c_R))-1d0)
+                                else
+                                    pcorr = 0d0
+                                end if
+
+                                ! Mass flux
                                 !$acc loop seq
                                 do i = 1, contxe
                                     flux_rs${XYZ}$_vf(j, k, l, i) = &
@@ -2184,7 +2201,8 @@ contains
                                                        s_P*(xi_R*(dir_flg(idxi)*s_S + &
                                                                   (1d0 - dir_flg(idxi))* &
                                                                   vel_R(idxi)) - vel_R(idxi))) + &
-                                                dir_flg(idxi)*(pres_R))
+                                                dir_flg(idxi)*(pres_R)) &
+                                        + (s_M/s_L)*(s_P/s_R)*dir_flg(idxi)*pcorr
                                     ! if (j==0) print*, 'flux_rs_vf', flux_rs_vf(cont_idx%end+dir_idx(i))%sf(j,k,l)
                                 end do
 
@@ -2198,7 +2216,8 @@ contains
                                     + xi_P*(vel_R(idx1)*(E_R + pres_R) + &
                                             s_P*(xi_R*(E_R + (s_S - vel_R(idx1))* &
                                                        (rho_R*s_S + pres_R/ &
-                                                        (s_R - vel_R(idx1)))) - E_R))
+                                                        (s_R - vel_R(idx1)))) - E_R)) &
+                                    + (s_M/s_L)*(s_P/s_R)*pcorr*s_S
 
                                 ! Volume fraction flux
                                 !$acc loop seq

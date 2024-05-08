@@ -634,6 +634,11 @@ contains
                              'instability_wave and n. Exiting ...')
         end if
 
+        if ((instability_wave .eqv. .true.) .and. (vel_profile .neqv. .true.)) then
+            call s_mpi_abort('Unsupported choices of the combination of values for '// &
+                             'instability_wave and vel_profile. Exiting ...')
+        end if
+
         ! Constraints on Immersed Boundary Method
         if (ib) then
             if (n <= 0) then
