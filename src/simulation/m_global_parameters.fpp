@@ -131,6 +131,7 @@ module m_global_parameters
     logical :: weno_avg       ! Average left/right cell-boundary states
     logical :: weno_Re_flux   !< WENO reconstruct velocity gradients for viscous stress tensor
     integer :: riemann_solver !< Riemann solver algorithm
+    logical :: apc            !< Anti-dissipation pressure correction for low Mach number flows
     integer :: wave_speeds    !< Wave speeds estimation method
     integer :: avg_state      !< Average state evaluation method
     logical :: alt_soundspeed !< Alternate mixture sound speed
@@ -474,6 +475,7 @@ contains
         weno_avg = .false.
         weno_Re_flux = .false.
         riemann_solver = dflt_int
+        apc = .false.
         wave_speeds = dflt_int
         avg_state = dflt_int
         alt_soundspeed = .false.

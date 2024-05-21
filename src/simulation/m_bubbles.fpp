@@ -399,7 +399,7 @@ contains
                             bub_r_src(j, k, l, q) = q_cons_vf(vs(q))%sf(j, k, l)
                         end if
 
-                        if (alf < 1.d-11) then
+                        if (alf < 1.d-9) then
                             bub_adv_src(j, k, l) = 0d0
                             bub_r_src(j, k, l, q) = 0d0
                             bub_v_src(j, k, l, q) = 0d0

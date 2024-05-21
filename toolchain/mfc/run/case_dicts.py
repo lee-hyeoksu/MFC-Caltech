@@ -99,7 +99,7 @@ SIMULATION = COMMON + [
     'mixture_err', 'lsq_deriv', 'fd_order', 'num_probes', 'probe_wrt', 
     'bubble_model', 'Monopole', 'num_mono', 'qbmm', 'R0_type', 'integral_wrt', 
     'num_integrals', 'cu_mpi', 'palpha_eps', 'ptgalpha_eps', 
-    'artificial_Ma', 'pi_fac', 'adap_dt', 'ib', 'num_ibs'
+    'artificial_Ma', 'pi_fac', 'adap_dt', 'ib', 'num_ibs', 'apc'
 ]
 
 for var in [ 'advection', 'diffusion', 'reactions' ]:
@@ -123,7 +123,7 @@ for cmp in ["x", "y", "z"]:
     SIMULATION.append(f'bc_{cmp}%ve1')
     SIMULATION.append(f'bc_{cmp}%ve2')
     SIMULATION.append(f'bc_{cmp}%ve3')
-    for prepend in ["domain%beg", "domain%end", "a", "b"]:
+    for prepend in ["domain%beg", "domain%end"]:
         SIMULATION.append(f"{cmp}_{prepend}")
 
 for wrt_id in range(1,10+1):

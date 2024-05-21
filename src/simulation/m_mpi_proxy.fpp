@@ -157,7 +157,7 @@ contains
             & 'parallel_io', 'hypoelasticity', 'bubbles', 'polytropic',        &
             & 'polydisperse', 'qbmm', 'monopole', 'probe_wrt', 'integral_wrt', &
             & 'prim_vars_wrt', 'weno_avg', 'file_per_process', 'relax',        &
-            & 'adv_n', 'adap_dt', 'artificial_Ma', 'ib' ]
+            & 'adv_n', 'adap_dt', 'artificial_Ma', 'apc', 'ib' ]
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
