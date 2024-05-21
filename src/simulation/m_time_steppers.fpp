@@ -263,6 +263,13 @@ contains
                 iz_t%beg:iz_t%beg + 1, 1:nnode, 1:nb))
         end if
 
+        if (adv_n) then
+            @:ALLOCATE(q_prim_vf(n_idx)%sf(ix_t%beg:ix_t%end, &
+                iy_t%beg:iy_t%end, &
+                iz_t%beg:iz_t%end))
+            @:ACC_SETUP_SFs(q_prim_vf(n_idx))
+        end if
+
         ! Allocating the cell-average RHS variables
         @:ALLOCATE_GLOBAL(rhs_vf(1:sys_size))
 
@@ -587,11 +594,10 @@ contains
 
     !> 3rd order TVD RK time-stepping algorithm
         !! @param t_step Current time-step
-    subroutine s_3rd_order_tvd_rk(t_step, time_avg, dt_in) ! --------------------------------
+    subroutine s_3rd_order_tvd_rk(t_step, time_avg) ! --------------------------------
 
         integer, intent(IN) :: t_step
         real(kind(0d0)), intent(INOUT) :: time_avg
-        real(kind(0d0)), intent(IN) :: dt_in
 
         integer :: i, j, k, l, q !< Generic loop iterator
         real(kind(0d0)) :: ts_error, denom, error_fraction, time_step_factor !< Generic loop iterator
@@ -632,7 +638,7 @@ contains
                     do j = 0, m
                         q_cons_ts(2)%vf(i)%sf(j, k, l) = &
                             q_cons_ts(1)%vf(i)%sf(j, k, l) &
-                            + dt_in*rhs_vf(i)%sf(j, k, l)
+                            + dt*rhs_vf(i)%sf(j, k, l)
                     end do
                 end do
             end do
@@ -648,7 +654,7 @@ contains
                             do q = 1, nnode
                                 pb_ts(2)%sf(j, k, l, q, i) = &
                                     pb_ts(1)%sf(j, k, l, q, i) &
-                                    + dt_in*rhs_pb(j, k, l, q, i)
+                                    + dt*rhs_pb(j, k, l, q, i)
                             end do
                         end do
                     end do
@@ -665,7 +671,7 @@ contains
                             do q = 1, nnode
                                 mv_ts(2)%sf(j, k, l, q, i) = &
                                     mv_ts(1)%sf(j, k, l, q, i) &
-                                    + dt_in*rhs_mv(j, k, l, q, i)
+                                    + dt*rhs_mv(j, k, l, q, i)
                             end do
                         end do
                     end do
@@ -703,7 +709,7 @@ contains
                         q_cons_ts(2)%vf(i)%sf(j, k, l) = &
                             (3d0*q_cons_ts(1)%vf(i)%sf(j, k, l) &
                              + q_cons_ts(2)%vf(i)%sf(j, k, l) &
-                             + dt_in*rhs_vf(i)%sf(j, k, l))/4d0
+                             + dt*rhs_vf(i)%sf(j, k, l))/4d0
                     end do
                 end do
             end do
@@ -719,7 +725,7 @@ contains
                                 pb_ts(2)%sf(j, k, l, q, i) = &
                                     (3d0*pb_ts(1)%sf(j, k, l, q, i) &
                                      + pb_ts(2)%sf(j, k, l, q, i) &
-                                     + dt_in*rhs_pb(j, k, l, q, i))/4d0
+                                     + dt*rhs_pb(j, k, l, q, i))/4d0
                             end do
                         end do
                     end do
@@ -737,7 +743,7 @@ contains
                                 mv_ts(2)%sf(j, k, l, q, i) = &
                                     (3d0*mv_ts(1)%sf(j, k, l, q, i) &
                                      + mv_ts(2)%sf(j, k, l, q, i) &
-                                     + dt_in*rhs_mv(j, k, l, q, i))/4d0
+                                     + dt*rhs_mv(j, k, l, q, i))/4d0
                             end do
                         end do
                     end do
@@ -774,7 +780,7 @@ contains
                         q_cons_ts(1)%vf(i)%sf(j, k, l) = &
                             (q_cons_ts(1)%vf(i)%sf(j, k, l) &
                              + 2d0*q_cons_ts(2)%vf(i)%sf(j, k, l) &
-                             + 2d0*dt_in*rhs_vf(i)%sf(j, k, l))/3d0
+                             + 2d0*dt*rhs_vf(i)%sf(j, k, l))/3d0
                     end do
                 end do
             end do
@@ -790,7 +796,7 @@ contains
                                 pb_ts(1)%sf(j, k, l, q, i) = &
                                     (pb_ts(1)%sf(j, k, l, q, i) &
                                      + 2d0*pb_ts(2)%sf(j, k, l, q, i) &
-                                     + 2d0*dt_in*rhs_pb(j, k, l, q, i))/3d0
+                                     + 2d0*dt*rhs_pb(j, k, l, q, i))/3d0
                             end do
                         end do
                     end do
@@ -808,7 +814,7 @@ contains
                                 mv_ts(1)%sf(j, k, l, q, i) = &
                                     (mv_ts(1)%sf(j, k, l, q, i) &
                                      + 2d0*mv_ts(2)%sf(j, k, l, q, i) &
-                                     + 2d0*dt_in*rhs_mv(j, k, l, q, i))/3d0
+                                     + 2d0*dt*rhs_mv(j, k, l, q, i))/3d0
                             end do
                         end do
                     end do
@@ -847,6 +853,111 @@ contains
         ! ==================================================================
 
     end subroutine s_3rd_order_tvd_rk ! ------------------------------------
+
+    !> Strang splitting scheme with 3rd order TVD RK time-stepping algorithm for
+        !!      the flux term and adaptive time stepping algorithm for
+        !!      the source term
+        !! @param t_step Current time-step
+    subroutine s_strang_splitting(t_step, time_avg) ! --------------------------------
+
+        integer, intent(IN) :: t_step
+        real(kind(0d0)), intent(INOUT) :: time_avg
+
+        integer :: i, j, k, l !< Generic loop iterator
+        real(kind(0d0)) :: start, finish
+
+        call cpu_time(start)
+
+        call nvtxStartRange("Time_Step")
+
+        ! Stage 1 of 3 =====================================================
+        call s_adaptive_dt_bubble(t_step)
+
+        ! Stage 2 of 3 =====================================================
+        call s_3rd_order_tvd_rk(t_step, time_avg)
+
+        ! Stage 3 of 3 =====================================================
+        call s_adaptive_dt_bubble(t_step)
+
+        call nvtxEndRange
+
+        call cpu_time(finish)
+
+        time = time + (finish - start)
+
+        if (t_step >= 4) then
+            time_avg = (abs(finish - start) + (t_step - 4)*time_avg)/(t_step - 3)
+        else
+            time_avg = 0d0
+        end if
+
+        ! ==================================================================
+
+    end subroutine s_strang_splitting ! ------------------------------------
+
+    !> Bubble source part in Strang operator splitting scheme
+        !! @param q_cons_vf conservative variables
+    subroutine s_adaptive_dt_bubble(t_step) ! ------------------------
+
+        integer, intent(IN) :: t_step
+
+        type(int_bounds_info) :: ix, iy, iz
+        type(vector_field) :: gm_alpha_qp
+
+        integer :: i, j, k, l, q !< Generic loop iterator
+
+        ix%beg = 0; iy%beg = 0; iz%beg = 0
+        ix%end = m; iy%end = n; iz%end = p
+        call s_convert_conservative_to_primitive_variables( &
+            q_cons_ts(1)%vf, &
+            q_prim_vf, &
+            gm_alpha_qp%vf, &
+            ix, iy, iz)
+
+        call s_compute_bubble_source(q_cons_ts(1)%vf, q_prim_vf, t_step, rhs_vf)
+
+        call s_comp_alpha_from_n(q_cons_ts(1)%vf)
+
+        if (artificial_Ma) call s_update_energy(q_cons_ts(1)%vf, q_prim_vf)
+
+    end subroutine s_adaptive_dt_bubble ! ------------------------------
+
+    !> 
+    subroutine s_update_energy(q_cons_vf, q_prim_vf)
+        type(scalar_field), dimension(sys_size), intent(INOUT) :: q_cons_vf, q_prim_vf
+        real(kind(0d0)) :: Gamma, Pi_inf_true, Pi_inf_arti
+        real(kind(0d0)) :: pres_old, dyn_pres, alf_old, alf_new
+        integer(kind(0d0)) :: i, j, k, l
+
+        Gamma = gammas(1)
+        Pi_inf_arti = pi_infs(1)
+        Pi_inf_true = pi_infs(1)/pi_fac
+
+        !$acc parallel loop collapse(3) gang vector default(present)
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    pres_old = q_prim_vf(E_idx)%sf(j, k, l)
+                    alf_old = q_prim_vf(alf_idx)%sf(j, k, l)
+                    alf_new = q_cons_vf(alf_idx)%sf(j, k, l)
+
+                    dyn_pres = 0d0
+                    !$acc loop seq
+                    do i = momxb, momxe
+                        dyn_pres = dyn_pres + 5d-1*q_cons_vf(i)%sf(j, k, l)* &
+                                   q_prim_vf(i)%sf(j, k, l)
+                    end do
+
+                    q_prim_vf(E_idx)%sf(j, k, l) = (1d0 - alf_old)/(1d0 - alf_new)*pres_old + &
+                                        Pi_inf_true/Gamma*(alf_new - alf_old)/(1d0 - alf_new)
+
+                    q_cons_vf(E_idx)%sf(j, k, l) = dyn_pres + (1d0 - alf_new)* &
+                            (Gamma*q_prim_vf(E_idx)%sf(j, k, l) + Pi_inf_arti)
+                end do
+            end do
+        end do
+
+    end subroutine s_update_energy
 
     !> Strang splitting scheme with 3rd order TVD RK time-stepping algorithm for
         !!      the flux term and adaptive time stepping algorithm for

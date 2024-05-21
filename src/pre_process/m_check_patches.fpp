@@ -111,7 +111,8 @@ contains
 
         ! Constraints on smoothing initial condition patch parameters
         do i = 1, num_patches
-            if (i > 1 .and. (patch_icpp(i)%geometry == 2 .or. &
+            if (i > 1 .and. (patch_icpp(i)%geometry == 1 .or. &
+                             patch_icpp(i)%geometry == 2 .or. &
                              patch_icpp(i)%geometry == 4 .or. &
                              patch_icpp(i)%geometry == 5 .or. &
                              patch_icpp(i)%geometry == 8 .or. &
