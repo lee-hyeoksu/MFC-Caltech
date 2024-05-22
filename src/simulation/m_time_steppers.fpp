@@ -924,12 +924,12 @@ contains
 
     !> 
     subroutine s_update_energy(q_cons_vf, q_prim_vf)
-        type(scalar_field), dimension(sys_size), intent(INOUT) :: q_cons_vf, q_prim_vf
-        real(kind(0d0)) :: Gamma, Pi_inf_true, Pi_inf_arti
-        real(kind(0d0)) :: pres_old, dyn_pres, alf_old, alf_new
+        type(scalar_field), dimension(sys_size), intent(INOUT) :: q_cons_vf
+        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
+        real(kind(0d0)) :: Pi_inf_true, Pi_inf_arti
+        real(kind(0d0)) :: alf_old, alf_new
         integer(kind(0d0)) :: i, j, k, l
 
-        Gamma = gammas(1)
         Pi_inf_arti = pi_infs(1)
         Pi_inf_true = pi_infs(1)/pi_fac
 
@@ -937,22 +937,11 @@ contains
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-                    pres_old = q_prim_vf(E_idx)%sf(j, k, l)
                     alf_old = q_prim_vf(alf_idx)%sf(j, k, l)
                     alf_new = q_cons_vf(alf_idx)%sf(j, k, l)
 
-                    dyn_pres = 0d0
-                    !$acc loop seq
-                    do i = momxb, momxe
-                        dyn_pres = dyn_pres + 5d-1*q_cons_vf(i)%sf(j, k, l)* &
-                                   q_prim_vf(i)%sf(j, k, l)
-                    end do
-
-                    q_prim_vf(E_idx)%sf(j, k, l) = (1d0 - alf_old)/(1d0 - alf_new)*pres_old + &
-                                        Pi_inf_true/Gamma*(alf_new - alf_old)/(1d0 - alf_new)
-
-                    q_cons_vf(E_idx)%sf(j, k, l) = dyn_pres + (1d0 - alf_new)* &
-                            (Gamma*q_prim_vf(E_idx)%sf(j, k, l) + Pi_inf_arti)
+                    q_cons_vf(E_idx)%sf(j, k, l) = q_cons_vf(E_idx)%sf(j, k, l) + &
+                                                  (alf_new - alf_old)*(Pi_inf_true - Pi_inf_arti)
                 end do
             end do
         end do
