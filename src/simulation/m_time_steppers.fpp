@@ -272,6 +272,13 @@ contains
                 iz_t%beg:iz_t%beg + 1, 1:nnode, 1:nb))
         end if
 
+        if (adv_n) then
+            @:ALLOCATE(q_prim_vf(n_idx)%sf(ix_t%beg:ix_t%end, &
+                iy_t%beg:iy_t%end, &
+                iz_t%beg:iz_t%end))
+            @:ACC_SETUP_SFs(q_prim_vf(n_idx))
+        end if
+
         ! Allocating the cell-average RHS variables
         @:ALLOCATE_GLOBAL(rhs_vf(1:sys_size))
 
@@ -590,11 +597,10 @@ contains
 
     !> 3rd order TVD RK time-stepping algorithm
         !! @param t_step Current time-step
-    subroutine s_3rd_order_tvd_rk(t_step, time_avg, dt_in) ! --------------------------------
+    subroutine s_3rd_order_tvd_rk(t_step, time_avg) ! --------------------------------
 
         integer, intent(IN) :: t_step
         real(kind(0d0)), intent(INOUT) :: time_avg
-        real(kind(0d0)), intent(IN) :: dt_in
 
         integer :: i, j, k, l, q !< Generic loop iterator
         real(kind(0d0)) :: ts_error, denom, error_fraction, time_step_factor !< Generic loop iterator
@@ -635,7 +641,7 @@ contains
                     do j = 0, m
                         q_cons_ts(2)%vf(i)%sf(j, k, l) = &
                             q_cons_ts(1)%vf(i)%sf(j, k, l) &
-                            + dt_in*rhs_vf(i)%sf(j, k, l)
+                            + dt*rhs_vf(i)%sf(j, k, l)
                     end do
                 end do
             end do
@@ -651,7 +657,7 @@ contains
                             do q = 1, nnode
                                 pb_ts(2)%sf(j, k, l, q, i) = &
                                     pb_ts(1)%sf(j, k, l, q, i) &
-                                    + dt_in*rhs_pb(j, k, l, q, i)
+                                    + dt*rhs_pb(j, k, l, q, i)
                             end do
                         end do
                     end do
@@ -668,7 +674,7 @@ contains
                             do q = 1, nnode
                                 mv_ts(2)%sf(j, k, l, q, i) = &
                                     mv_ts(1)%sf(j, k, l, q, i) &
-                                    + dt_in*rhs_mv(j, k, l, q, i)
+                                    + dt*rhs_mv(j, k, l, q, i)
                             end do
                         end do
                     end do
@@ -710,7 +716,7 @@ contains
                         q_cons_ts(2)%vf(i)%sf(j, k, l) = &
                             (3d0*q_cons_ts(1)%vf(i)%sf(j, k, l) &
                              + q_cons_ts(2)%vf(i)%sf(j, k, l) &
-                             + dt_in*rhs_vf(i)%sf(j, k, l))/4d0
+                             + dt*rhs_vf(i)%sf(j, k, l))/4d0
                     end do
                 end do
             end do
@@ -726,7 +732,7 @@ contains
                                 pb_ts(2)%sf(j, k, l, q, i) = &
                                     (3d0*pb_ts(1)%sf(j, k, l, q, i) &
                                      + pb_ts(2)%sf(j, k, l, q, i) &
-                                     + dt_in*rhs_pb(j, k, l, q, i))/4d0
+                                     + dt*rhs_pb(j, k, l, q, i))/4d0
                             end do
                         end do
                     end do
@@ -744,7 +750,7 @@ contains
                                 mv_ts(2)%sf(j, k, l, q, i) = &
                                     (3d0*mv_ts(1)%sf(j, k, l, q, i) &
                                      + mv_ts(2)%sf(j, k, l, q, i) &
-                                     + dt_in*rhs_mv(j, k, l, q, i))/4d0
+                                     + dt*rhs_mv(j, k, l, q, i))/4d0
                             end do
                         end do
                     end do
@@ -785,7 +791,7 @@ contains
                         q_cons_ts(1)%vf(i)%sf(j, k, l) = &
                             (q_cons_ts(1)%vf(i)%sf(j, k, l) &
                              + 2d0*q_cons_ts(2)%vf(i)%sf(j, k, l) &
-                             + 2d0*dt_in*rhs_vf(i)%sf(j, k, l))/3d0
+                             + 2d0*dt*rhs_vf(i)%sf(j, k, l))/3d0
                     end do
                 end do
             end do
@@ -801,7 +807,7 @@ contains
                                 pb_ts(1)%sf(j, k, l, q, i) = &
                                     (pb_ts(1)%sf(j, k, l, q, i) &
                                      + 2d0*pb_ts(2)%sf(j, k, l, q, i) &
-                                     + 2d0*dt_in*rhs_pb(j, k, l, q, i))/3d0
+                                     + 2d0*dt*rhs_pb(j, k, l, q, i))/3d0
                             end do
                         end do
                     end do
@@ -819,7 +825,7 @@ contains
                                 mv_ts(1)%sf(j, k, l, q, i) = &
                                     (mv_ts(1)%sf(j, k, l, q, i) &
                                      + 2d0*mv_ts(2)%sf(j, k, l, q, i) &
-                                     + 2d0*dt_in*rhs_mv(j, k, l, q, i))/3d0
+                                     + 2d0*dt*rhs_mv(j, k, l, q, i))/3d0
                             end do
                         end do
                     end do
@@ -874,13 +880,13 @@ contains
         call nvtxStartRange("Time_Step")
 
         ! Stage 1 of 3 =====================================================
-        call s_3rd_order_tvd_rk(t_step, time_avg, 0.5d0*dt)
-
-        ! Stage 2 of 3 =====================================================
         call s_adaptive_dt_bubble(t_step)
 
+        ! Stage 2 of 3 =====================================================
+        call s_3rd_order_tvd_rk(t_step, time_avg)
+
         ! Stage 3 of 3 =====================================================
-        call s_3rd_order_tvd_rk(t_step, time_avg, 0.5d0*dt)
+        call s_adaptive_dt_bubble(t_step)
 
         call nvtxEndRange
 
@@ -913,6 +919,10 @@ contains
 
         call s_compute_bubble_source(q_cons_ts(1)%vf, q_prim_vf, t_step, rhs_vf)
 
+        call s_comp_alpha_from_n(q_cons_ts(1)%vf)
+
+        if (artificial_Ma) call s_update_energy(q_cons_ts(1)%vf, q_prim_vf)
+
     end subroutine s_adaptive_dt_bubble ! ------------------------------
 
     !> This subroutine applies the body forces source term at each
@@ -937,8 +947,32 @@ contains
                 end do
             end do
         end do
-
     end subroutine s_apply_bodyforces
+
+    !> 
+    subroutine s_update_energy(q_cons_vf, q_prim_vf)
+        type(scalar_field), dimension(sys_size), intent(INOUT) :: q_cons_vf
+        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
+        real(kind(0d0)) :: Pi_inf_true, Pi_inf_arti
+        real(kind(0d0)) :: alf_old, alf_new
+        integer(kind(0d0)) :: i, j, k, l
+
+        Pi_inf_arti = pi_infs(1)
+        Pi_inf_true = pi_infs(1)/pi_fac
+
+        !$acc parallel loop collapse(3) gang vector default(present)
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    alf_old = q_prim_vf(alf_idx)%sf(j, k, l)
+                    alf_new = q_cons_vf(alf_idx)%sf(j, k, l)
+
+                    q_cons_vf(E_idx)%sf(j, k, l) = q_cons_vf(E_idx)%sf(j, k, l) + &
+                                                  (alf_new - alf_old)*(Pi_inf_true - Pi_inf_arti)
+                end do
+            end do
+        end do
+    end subroutine s_update_energy
 
     !> This subroutine saves the temporary q_prim_vf vector
         !!      into the q_prim_ts vector that is then used in p_main

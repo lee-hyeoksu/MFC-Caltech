@@ -188,6 +188,8 @@ SIMULATION.update({
     'ptgalpha_eps': ParamType.REAL,
     'pi_fac': ParamType.REAL,
     'adap_dt': ParamType.LOG,
+    'artificial_Ma': ParamType.LOG,
+    'apc': ParamType.LOG,
     'ib': ParamType.LOG,
     'num_ibs': ParamType.INT,
 })
@@ -195,6 +197,7 @@ SIMULATION.update({
 # NOTE: Not currently present
 # for var in [ 'advection', 'diffusion', 'reactions' ]:
 #     SIMULATION.append(f'chem_params%{var}')
+
 
 for ib_id in range(1, 10+1):
     for real_attr, ty in [("geometry", ParamType.INT), ("radius", ParamType.REAL),
@@ -221,7 +224,6 @@ for cmp in ["x", "y", "z"]:
     for var in ["k", "w", "p", "g"]:
         SIMULATION[f'{var}_{cmp}'] = ParamType.REAL
     SIMULATION[f'bf_{cmp}'] = ParamType.LOG
-
 
     for prepend in ["domain%beg", "domain%end"]:
         SIMULATION[f"{cmp}_{prepend}"] = ParamType.REAL

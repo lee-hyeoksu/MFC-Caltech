@@ -156,7 +156,8 @@ contains
             relax, relax_model, &
             palpha_eps, ptgalpha_eps, &
             R0_type, file_per_process, sigma, &
-            pi_fac, adv_n, adap_dt, bf_x, bf_y, bf_z, &
+            pi_fac, adv_n, adap_dt, artificial_Ma, apc, &
+            bf_x, bf_y, bf_z, &
             k_x, k_y, k_z, w_x, w_y, w_z, p_x, p_y, p_z, &
             g_x, g_y, g_z
 
@@ -1107,7 +1108,7 @@ contains
         elseif (time_stepper == 2) then
             call s_2nd_order_tvd_rk(t_step, time_avg)
         elseif (time_stepper == 3 .and. (.not. adap_dt)) then
-            call s_3rd_order_tvd_rk(t_step, time_avg, dt)
+            call s_3rd_order_tvd_rk(t_step, time_avg)
         elseif (time_stepper == 3 .and. adap_dt) then
             call s_strang_splitting(t_step, time_avg)
         end if
@@ -1190,6 +1191,7 @@ contains
                         do j = 0, m
                             if (ieee_is_nan(q_cons_ts(1)%vf(i)%sf(j, k, l))) then
                                 print *, "NaN(s) in timestep output.", j, k, l, i, proc_rank, t_step, m, n, p
+                                print *, x_cc(j)
                                 error stop "NaN(s) in timestep output."
                             end if
                         end do
@@ -1391,7 +1393,7 @@ contains
         if (qbmm .and. .not. polytropic) then
             !$acc update device(pb_ts(1)%sf, mv_ts(1)%sf)
         end if
-        !$acc update device(nb, R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles, polytropic, polydisperse, qbmm, R0_type, ptil, bubble_model, thermal, poly_sigma, adv_n, adap_dt, n_idx, pi_fac)
+        !$acc update device(nb, R0ref, Ca, Web, Re_inv, weight, R0, V0, bubbles, polytropic, polydisperse, qbmm, R0_type, ptil, bubble_model, thermal, poly_sigma, adv_n, adap_dt, n_idx, artificial_Ma, pi_fac, apc)
         !$acc update device(R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v, k_n, k_v, pb0, mass_n0, mass_v0, Pe_T, Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN , mul0, ss, gamma_v, mu_v, gamma_m, gamma_n, mu_n, gam)
 
         !$acc update device(monopole, num_mono)

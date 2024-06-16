@@ -140,7 +140,7 @@ contains
                 end do
             end do
 
-            y_cb = y_cb*length
+            y_cb = y_cb/(y_cb(n) - y_cb(-1))*length
             y_cc = (y_cb(0:n) + y_cb(-1:n - 1))/2d0
 
             dy = minval(y_cb(0:n) - y_cb(-1:n - 1))
@@ -277,7 +277,7 @@ contains
                     end do
                 end do
 
-                y_cb_glb = y_cb_glb*length
+                y_cb_glb = y_cb_glb/(y_cb_glb(n) - y_cb_glb(-1))*length
 
             end if
 
