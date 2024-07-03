@@ -395,22 +395,13 @@ contains
         !!              and (1,0) are superposed. For a 3D waves, (4,4), (4,-4),
         !!              (2,2), (2,-2), (1,1), (1,-1) areadded on top of 2D waves.
     subroutine s_superposition_instability_wave() ! ------------------------
-        real(kind(0d0)), allocatable, dimension(:, :, :, :) :: wave, wave1, wave2, wave_tmp
+        real(kind(0d0)), dimension(5, 0:m, 0:n, 0:p) :: wave, wave1, wave2, wave_tmp
         real(kind(0d0)) :: xratio, uratio
         real(kind(0d0)), dimension(6) :: shift
-        integer :: nVar
+        real(kind(0d0)) :: gam
         integer :: i, j, k
-
-        if (bubbles) then
-            nVar = 6
-        else 
-            nVar = 5
-        end if
-
-        allocate (wave(nVar, 0:m, 0:n, 0:p))
-        allocate (wave1(nVar, 0:m, 0:n, 0:p))
-        allocate (wave2(nVar, 0:m, 0:n, 0:p))
-        allocate (wave_tmp(nVar, 0:m, 0:n, 0:p))
+        
+        gam = 1d0 + 1d0/fluid_pp(1)%gamma
 
         xratio = 59d0/patch_icpp(1)%length_y ! input scale / mixing layer scale
         uratio = 1d0/patch_icpp(1)%vel(1) ! input scale / mixing layer scale
@@ -420,11 +411,11 @@ contains
         wave2 = 0d0
 
         ! Compute 2D waves
-        call s_instability_wave(nVar, 2*pi*4.0/59.0, 0d0, wave_tmp, 0d0)
+        call s_instability_wave(2*pi*4.0/59.0, 0d0, wave_tmp, 0d0)
         wave1 = wave1 + wave_tmp
-        call s_instability_wave(nVar, 2*pi*2.0/59.0, 0d0, wave_tmp, 0d0)
+        call s_instability_wave(2*pi*2.0/59.0, 0d0, wave_tmp, 0d0)
         wave1 = wave1 + wave_tmp
-        call s_instability_wave(nVar, 2*pi*1.0/59.0, 0d0, wave_tmp, 0d0)
+        call s_instability_wave(2*pi*1.0/59.0, 0d0, wave_tmp, 0d0)
         wave1 = wave1 + wave_tmp
         wave = wave1*0.05
 
@@ -461,17 +452,17 @@ contains
             ! shift(4) = 2*pi*3d0/71d0;  shift(5) = 2*pi*23d0/67d0; shift(6) = 2*pi*11d0/63d0;
             
             ! Compute 3D waves with phase shifts.
-            call s_instability_wave(nVar, 2*pi*4.0/59.0, 2*pi*4.0/59.0, wave_tmp, shift(1)) !2*pi*19d0/37d0) !2*pi*13d0/43d0) !2*pi*17d0/53d0) !2*pi*7d0/61d0) !2*pi*11d0/31d0)
+            call s_instability_wave(2*pi*4.0/59.0, 2*pi*4.0/59.0, wave_tmp, shift(1))
             wave2 = wave2 + wave_tmp
-            call s_instability_wave(nVar, 2*pi*2.0/59.0, 2*pi*2.0/59.0, wave_tmp, shift(2)) !2*pi*31d0/37d0) !2*pi*11d0/43d0) !2*pi*19d0/53d0) !2*pi*11d0/61d0) !2*pi*13d0/31d0)
+            call s_instability_wave(2*pi*2.0/59.0, 2*pi*2.0/59.0, wave_tmp, shift(2))
             wave2 = wave2 + wave_tmp
-            call s_instability_wave(nVar, 2*pi*1.0/59.0, 2*pi*1.0/59.0, wave_tmp, shift(3)) !2*pi*29d0/37d0) !2*pi*39d0/43d0) !2*pi*31d0/53d0) !2*pi*19d0/61d0) !2*pi*17d0/31d0)
+            call s_instability_wave(2*pi*1.0/59.0, 2*pi*1.0/59.0, wave_tmp, shift(3))
             wave2 = wave2 + wave_tmp
-            call s_instability_wave(nVar, 2*pi*4.0/59.0, -2*pi*4.0/59.0, wave_tmp, shift(4)) !2*pi*3d0/37d0) !2*pi*29d0/43d0) !2*pi*47d0/53d0) !2*pi*41d0/61d0) !2*pi*19d0/31d0)
+            call s_instability_wave(2*pi*4.0/59.0, -2*pi*4.0/59.0, wave_tmp, shift(4))
             wave2 = wave2 + wave_tmp
-            call s_instability_wave(nVar, 2*pi*2.0/59.0, -2*pi*2.0/59.0, wave_tmp, shift(5)) !2*pi*23d0/37d0) !2*pi*23d0/43d0) !2*pi*29d0/53d0) !2*pi*53d0/61d0) !2*pi*23d0/31d0)
+            call s_instability_wave(2*pi*2.0/59.0, -2*pi*2.0/59.0, wave_tmp, shift(5))
             wave2 = wave2 + wave_tmp
-            call s_instability_wave(nVar, 2*pi*1.0/59.0, -2*pi*1.0/59.0, wave_tmp, shift(6)) !2*pi*11d0/37d0) !2*pi*19d0/43d0) !2*pi*3d0/53d0) !2*pi*59d0/61d0) !2*pi*29d0/31d0)
+            call s_instability_wave(2*pi*1.0/59.0, -2*pi*1.0/59.0, wave_tmp, shift(6))
             wave2 = wave2 + wave_tmp
             wave = wave + 0.15*wave2
         end if
@@ -488,9 +479,9 @@ contains
                     end if
                     q_prim_vf(E_idx)%sf(i, j, k) = q_prim_vf(E_idx)%sf(i, j, k) + wave(5, i, j, k)  / uratio**2 ! p
                     if (bubbles) then
-                        q_prim_vf(alf_idx)%sf(i, j, k) = q_prim_vf(alf_idx)%sf(i, j, k)/q_prim_vf(n_idx)%sf(i, j, k)
-                        q_prim_vf(n_idx)%sf(i, j, k) = q_prim_vf(n_idx)%sf(i, j, k) + wave(6, i, j, k)  * xratio**3 ! n
-                        q_prim_vf(alf_idx)%sf(i, j, k) = q_prim_vf(alf_idx)%sf(i, j, k)*q_prim_vf(n_idx)%sf(i, j, k)
+                        call s_compute_equilibrium_radius(q_prim_vf(E_idx)%sf(i, j, k), q_prim_vf(bub_idx%rs(1))%sf(i, j, k))
+                        ! q_prim_vf(bub_idx%rs(1))%sf(i, j, k) = ((Ca + 2d0 / Web)/(q_prim_vf(E_idx)%sf(i, j, k) - 1d0 + Ca))**(1/(3d0*gam))
+                        q_prim_vf(alf_idx)%sf(i, j, k) = q_prim_vf(n_idx)%sf(i, j, k)*(4d0*pi/3d0)*q_prim_vf(bub_idx%rs(1))%sf(i, j, k)**3d0
                     end if
                 end do
             end do
@@ -498,15 +489,51 @@ contains
 
     end subroutine s_superposition_instability_wave ! ----------------------
 
+    subroutine s_compute_equilibrium_radius(pres, radius)
+        real(kind(0d0)), intent(IN) :: pres
+        real(kind(0d0)), intent(OUT) :: radius
+        real(kind(0d0)) :: r_old, r_new, tmp
+        real(kind(0d0)) :: f0, f1
+        real(kind(0d0)) :: gam
+        integer :: ii
+
+        gam = 1d0 + 1d0/fluid_pp(num_fluids + 1)%gamma
+
+        ! Initial guess
+        r_new = 1d0
+
+        ! Loop
+        ii = 1
+        do while (.true.)
+            r_old = r_new
+            f0 = (Ca + 2d0/(Web))*(1d0/r_old)**(3d0*gam) - 2d0/(Web*r_old) + 1d0 - Ca - pres
+            f1 = -3d0*gam*(Ca + 2d0/(Web))*(1d0/r_old)**(3d0*gam+1d0) + 2d0/(Web*r_old**2d0)
+
+           if (abs(f0) .le. 1e-9) then
+                radius = r_old
+                write(99,*) ii, f0, radius, pres
+                exit
+            end if
+            
+            if (abs(f1) < 1e-10) then
+                print *, "f1 < 1e-10"
+                exit
+            end if
+
+            r_new = r_old - f0/f1
+            ii = ii + 1
+        end do
+
+    end subroutine s_compute_equilibrium_radius
+
     !>  This subroutine computes instability waves for a given set of spatial
         !!              wavenumbers (alpha, beta) in x and z directions.
         !!              The eigenvalue problem is derived from the linearized
         !!              Euler equations with parallel mean flow assumption
         !!              (See Sandham 1989 PhD thesis for details).
-    subroutine s_instability_wave(nVar, alpha, beta, wave, shift)
-        integer, intent(in) :: nVar
+    subroutine s_instability_wave(alpha, beta, wave, shift)
         real(kind(0d0)), intent(in) :: alpha, beta !<  spatial wavenumbers
-        real(kind(0d0)), dimension(nVar, 0:m, 0:n, 0:p), intent(inout) :: wave !< instability wave
+        real(kind(0d0)), dimension(5, 0:m, 0:n, 0:p), intent(inout) :: wave !< instability wave
         real(kind(0d0)) :: shift !< phase shift
 
         real(kind(0d0)), dimension(0:n + 1) :: rho_mean, u_mean !<  mean density and velocity profiles
@@ -554,28 +581,26 @@ contains
         d(n + 1, n + 1) = 1d0/((y_cb(n) - y_cb(n - 1))*xratio)
 
         ! Compute 
-        call s_solve_linear_system(nVar, alpha, beta, u_mean, rho_mean, p_mean, nbub_mean, d, gam, pi_inf, mach, wave, shift)
+        call s_solve_linear_system(alpha, beta, u_mean, rho_mean, p_mean, nbub_mean, d, gam, pi_inf, mach, wave, shift)
 
     end subroutine s_instability_wave
 
-
-    subroutine s_solve_linear_system(nVar, alpha, beta, u_mean, rho_mean, p_mean, nbub_mean, d, gam, pi_inf, mach, wave, shift)
-        integer, intent(in) :: nVar
+    subroutine s_solve_linear_system(alpha, beta, u_mean, rho_mean, p_mean, nbub_mean, d, gam, pi_inf, mach, wave, shift)
         real(kind(0d0)), intent(in) :: alpha, beta !<  spatial wavenumbers
         real(kind(0d0)), dimension(0:n + 1), intent(in) :: rho_mean, u_mean !<  mean density and velocity profiles
         real(kind(0d0)), intent(in) :: p_mean, nbub_mean !< mean pressure and number density
         real(kind(0d0)), dimension(0:n + 1, 0:n + 1), intent(in) :: d !< differential operator in y dir
         real(kind(0d0)), intent(in) :: gam, pi_inf, mach, shift
-        real(kind(0d0)), dimension(nVar, 0:m, 0:n, 0:p),intent(inout) :: wave
+        real(kind(0d0)), dimension(5, 0:m, 0:n, 0:p),intent(inout) :: wave
 
         real(kind(0d0)), dimension(0:n + 1) :: drho_mean, du_mean !< y-derivatives of mean profiles
-        real(kind(0d0)), dimension(0:nVar*(n + 2) - 1, 0:nVar*(n + 2) - 1) :: ar, ai    !< matrices for eigenvalue problem
-        real(kind(0d0)), dimension(0:nVar*(n + 2) - 1, 0:nVar*(n + 2) - 1) :: br, bi, ci !< matrices for eigenvalue problem
-        real(kind(0d0)), dimension(0:nVar*n - 5, 0:nVar*n - 5) :: hr, hi    !< matrices for eigenvalue problem
+        real(kind(0d0)), dimension(0:5*(n + 2) - 1, 0:5*(n + 2) - 1) :: ar, ai    !< matrices for eigenvalue problem
+        real(kind(0d0)), dimension(0:5*(n + 2) - 1, 0:5*(n + 2) - 1) :: br, bi, ci !< matrices for eigenvalue problem
+        real(kind(0d0)), dimension(0:5*n - 5, 0:5*n - 5) :: hr, hi    !< matrices for eigenvalue problem
 
-        real(kind(0d0)), dimension(0:nVar*n - 5, 0:nVar*n - 5) :: zr, zi !< eigenvectors
-        real(kind(0d0)), dimension(0:nVar*n - 5) :: wr, wi !< eigenvalues
-        real(kind(0d0)), dimension(0:nVar*n - 5) :: fv1, fv2, fv3 !< temporary memory
+        real(kind(0d0)), dimension(0:5*n - 5, 0:5*n - 5) :: zr, zi !< eigenvectors
+        real(kind(0d0)), dimension(0:5*n - 5) :: wr, wi !< eigenvalues
+        real(kind(0d0)), dimension(0:5*n - 5) :: fv1, fv2, fv3 !< temporary memory
 
         integer :: ierr
         integer :: i, j, k, l !<  generic loop iterators
@@ -616,18 +641,18 @@ contains
             ii = 5; jj = 4; br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = gam*(p_mean + pi_inf)*beta; 
             ii = 5; jj = 5; br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = alpha*u_mean(j); 
 
-            if (bubbles) then
-                ii = 6; jj = 2; br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = alpha*nbub_mean; 
-                ii = 6; jj = 4; br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = beta*nbub_mean;
-                ii = 6; jj = 6; br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = alpha*u_mean(j);
-            end if
+            ! if (bubbles) then
+            !     ii = 6; jj = 2; br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = alpha*nbub_mean; 
+            !     ii = 6; jj = 4; br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = beta*nbub_mean;
+            !     ii = 6; jj = 6; br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = alpha*u_mean(j);
+            ! end if
             do k = 0, n + 1
                 ii = 1; jj = 3; ci((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + k) = -rho_mean(j)*d(j, k); 
                 ii = 3; jj = 5; ci((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + k) = -d(j, k)/rho_mean(j); 
                 ii = 5; jj = 3; ci((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + k) = -gam*(p_mean + pi_inf)*d(j, k); 
-                if (bubbles) then
-                    ii = 6; jj = 3; ci((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + k) = -nbub_mean*d(j, k); 
-                end if
+                ! if (bubbles) then
+                !     ii = 6; jj = 3; ci((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + k) = -nbub_mean*d(j, k); 
+                ! end if
             end do
         end do
         ar = br
@@ -639,33 +664,32 @@ contains
 
         else if (bc_y%beg == -6 .and. bc_y%end == -6) then
             ! Nonreflecting subsonic beffer BC
-            call s_instability_nonreflecting_subsonic_buffer_bc(nVar, ar, ai, hr, hi, rho_mean, mach)
+            call s_instability_nonreflecting_subsonic_buffer_bc(ar, ai, hr, hi, rho_mean, mach)
         end if
 
         ! Compute eigenvalues and eigenvectors
-        call cg(nVar*n - 4, nVar*n - 4, hr, hi, wr, wi, zr, zi, fv1, fv2, fv3, ierr)
+        call cg(5*n - 4, 5*n - 4, hr, hi, wr, wi, zr, zi, fv1, fv2, fv3, ierr)
 
         ! Generate instability wave
-        call s_generate_wave(nVar, wr, wi, zr, zi, rho_mean, mach, alpha, beta, wave, shift)
+        call s_generate_wave(wr, wi, zr, zi, rho_mean, mach, alpha, beta, wave, shift)
 
     end subroutine s_solve_linear_system
 
 
-    subroutine s_instability_nonreflecting_subsonic_buffer_bc(nVar, ar, ai, hr, hi, rho_mean, mach)
-        integer, intent(in) :: nVar
-        real(kind(0d0)), dimension(0:nVar*(n + 2) - 1, 0:nVar*(n + 2) - 1), intent(inout) :: ar, ai    !< matrices for eigenvalue problem
-        real(kind(0d0)), dimension(0:nVar*n - 5, 0:nVar*n - 5), intent(inout) :: hr, hi    !< matrices for eigenvalue problem
+    subroutine s_instability_nonreflecting_subsonic_buffer_bc(ar, ai, hr, hi, rho_mean, mach)
+        real(kind(0d0)), dimension(0:5*(n + 2) - 1, 0:5*(n + 2) - 1), intent(inout) :: ar, ai    !< matrices for eigenvalue problem
+        real(kind(0d0)), dimension(0:5*n - 5, 0:5*n - 5), intent(inout) :: hr, hi    !< matrices for eigenvalue problem
         real(kind(0d0)), dimension(0:n + 1), intent(in) :: rho_mean !<  mean density profiles
         real(kind(0d0)), intent(in) :: mach
 
-        real(kind(0d0)), dimension(0:nVar*n - 1, 0:nVar*n - 1) :: fr, fi    !< matrices for eigenvalue problem
-        real(kind(0d0)), dimension(0:nVar*n - 5, 0:nVar*n - 1) :: gr, gi    !< matrices for eigenvalue problem
+        real(kind(0d0)), dimension(0:5*n - 1, 0:5*n - 1) :: fr, fi    !< matrices for eigenvalue problem
+        real(kind(0d0)), dimension(0:5*n - 5, 0:5*n - 1) :: gr, gi    !< matrices for eigenvalue problem
         integer :: i, j, k, l, ii, jj
 
         ! Condition 1: v = 0 at BC
 
         ! Condition 2: du/dy = 0 at BC
-        do j = 0, nVar*(n + 2) - 1
+        do j = 0, 5*(n + 2) - 1
             ! beg
             ii = (n + 2)
             ar(j, ii + 1) = ar(j, ii + 1) + ar(j, ii)
@@ -677,7 +701,7 @@ contains
         end do
 
         ! Condition 3: dw/dy = 0 at BC
-        do j = 0, nVar*(n + 2) - 1
+        do j = 0, 5*(n + 2) - 1
             ! beg
             ii = 3*(n + 2)
             ar(j, ii + 1) = ar(j, ii + 1) + ar(j, ii)
@@ -689,7 +713,7 @@ contains
         end do
 
         ! Condition 4: dp/dy +- rho c dv/dy = 0 at BC
-        do j = 0, nVar*(n + 2) - 1
+        do j = 0, 5*(n + 2) - 1
             ! beg
             ii = 4*(n + 2)
             ar(j, ii + 1) = ar(j, ii + 1) + ar(j, ii)
@@ -708,7 +732,7 @@ contains
         end do
 
         ! Condition 5: c^2 drho/dy +- dp/dy = 0 at BC
-        do j = 0, nVar*(n + 2) - 1
+        do j = 0, 5*(n + 2) - 1
             ! beg
             ii = 0
             ar(j, ii + 1) = ar(j, ii + 1) + ar(j, ii)
@@ -727,24 +751,24 @@ contains
         end do
 
         ! Condition 6: dn/dy = 0 at BC
-        if (bubbles) then
-            do j = 0, nVar*(n + 2) - 1
-                ! beg
-                ii = 5*(n + 2)
-                ar(j, ii + 1) = ar(j, ii + 1) + ar(j, ii)
-                ai(j, ii + 1) = ai(j, ii + 1) + ai(j, ii)
-                ! end
-                ii = 6*(n + 2) - 1
-                ar(j, ii - 1) = ar(j, ii - 1) + ar(j, ii)
-                ai(j, ii - 1) = ai(j, ii - 1) + ai(j, ii)
-            end do
-        end if
+        ! if (bubbles) then
+        !     do j = 0, nVar*(n + 2) - 1
+        !         ! beg
+        !         ii = 5*(n + 2)
+        !         ar(j, ii + 1) = ar(j, ii + 1) + ar(j, ii)
+        !         ai(j, ii + 1) = ai(j, ii + 1) + ai(j, ii)
+        !         ! end
+        !         ii = 6*(n + 2) - 1
+        !         ar(j, ii - 1) = ar(j, ii - 1) + ar(j, ii)
+        !         ai(j, ii - 1) = ai(j, ii - 1) + ai(j, ii)
+        !     end do
+        ! end if
 
         ! Remove rho, u, v, w, p at BC
         fr = 0d0
         fi = 0d0
-        do ii = 1, nVar
-            do jj = 1, nVar
+        do ii = 1, 5
+            do jj = 1, 5
                 do k = 0, n - 1
                     do l = 0, n - 1
                         fr((ii - 1)*n + k, (jj - 1)*n + l) = ar((ii - 1)*(n + 2) + k + 1, (jj - 1)*(n + 2) + l + 1)
@@ -756,8 +780,8 @@ contains
 
         gr = 0d0
         gi = 0d0
-        do ii = 1, nVar
-            do j = 0, nVar*n - 1
+        do ii = 1, 5
+            do j = 0, 5*n - 1
                 if (ii < 3) then 
                     do k = 0, n - 1
                         gr((ii - 1)*n + k, j) = fr((ii - 1)*n + k, j)
@@ -779,8 +803,8 @@ contains
 
         hr = 0d0
         hi = 0d0
-        do i = 0, nVar*n - 5
-            do jj = 1, nVar
+        do i = 0, 5*n - 5
+            do jj = 1, 5
                 if (jj < 3) then 
                     do k = 0, n - 1
                         hr(i, (jj - 1)*n + k) = gr(i, (jj - 1)*n + k)
@@ -811,17 +835,16 @@ contains
     !>  This subroutine generates an instability wave using the most unstable
         !!              eigenvalue and corresponding eigenvector among the
         !!              given set of eigenvalues and eigenvectors.
-    subroutine s_generate_wave(nVar, wr, wi, zr, zi, rho_mean, mach, alpha, beta, wave, shift)
-        integer, intent(in) :: nVar
-        real(kind(0d0)), dimension(0:nVar*n - 5), intent(in) :: wr, wi !< eigenvalues
-        real(kind(0d0)), dimension(0:nVar*n - 5, 0:nVar*n - 5), intent(in) :: zr, zi !< eigenvectors
+    subroutine s_generate_wave(wr, wi, zr, zi, rho_mean, mach, alpha, beta, wave, shift)
+        real(kind(0d0)), dimension(0:5*n - 5), intent(in) :: wr, wi !< eigenvalues
+        real(kind(0d0)), dimension(0:5*n - 5, 0:5*n - 5), intent(in) :: zr, zi !< eigenvectors
         real(kind(0d0)), dimension(0:n + 1), intent(in) :: rho_mean
-        real(kind(0d0)), dimension(nVar, 0:m, 0:n, 0:p),intent(inout) :: wave
+        real(kind(0d0)), dimension(5, 0:m, 0:n, 0:p),intent(inout) :: wave
         real(kind(0d0)), intent(in) :: alpha, beta, mach, shift
 
-        real(kind(0d0)), dimension(0:nVar*n - 5) :: vr, vi, vnr, vni !< most unstable eigenvector
-        real(kind(0d0)), dimension(0:nVar*(n + 2) - 1) :: xbr, xbi !< eigenvectors
-        real(kind(0d0)), dimension(0:nVar*(n + 1) - 1) :: xcr, xci !< eigenvectors
+        real(kind(0d0)), dimension(0:5*n - 5) :: vr, vi, vnr, vni !< most unstable eigenvector
+        real(kind(0d0)), dimension(0:5*(n + 2) - 1) :: xbr, xbi !< eigenvectors
+        real(kind(0d0)), dimension(0:5*(n + 1) - 1) :: xcr, xci !< eigenvectors
         real(kind(0d0)) :: ang
         real(kind(0d0)) :: norm
         real(kind(0d0)) :: tr, ti, cr, ci !< temporary memory
@@ -833,7 +856,7 @@ contains
 
         ! Find the most unstable eigenvalue and corresponding eigenvector
         k = 0
-        do i = 1, nVar*n - 5
+        do i = 1, 5*n - 5
             if (wi(i) > wi(k)) then
                 k = i
             end if
@@ -843,7 +866,7 @@ contains
 
         ! Normalize the eigenvector by its component with the largest modulus.
         norm = 0d0
-        do i = 0, nVar*n - 5
+        do i = 0, 5*n - 5
             if (dsqrt(vr(i)**2 + vi(i)**2) > norm) then
                 idx = i
                 norm = dsqrt(vr(i)**2 + vi(i)**2)
@@ -852,7 +875,7 @@ contains
 
         tr = vr(idx)
         ti = vi(idx)
-        do i = 0, nVar*n - 5
+        do i = 0, 5*n - 5
             call cdiv(vr(i), vi(i), tr, ti, cr, ci)
             vnr(i) = cr
             vni(i) = ci
@@ -861,7 +884,7 @@ contains
         ! Reassign vectors
         xbr = 0d0
         xbi = 0d0
-        do i = 1, nVar
+        do i = 1, 5
             if (i < 3) then
                 do k = 0, n - 1
                     xbr((i - 1)*(n + 2) + k + 1) = vnr((i - 1)*n + k)
@@ -905,23 +928,23 @@ contains
         xbi(4*(n + 2) + n + 1) = xbi(4*(n + 2) + n) - xbi(2*(n + 2) + n) * rho_mean(n) / mach  
         
         ! n at BC
-        if (bubbles) then
-            xbr(5*(n + 2) + 0) = xbr(5*(n + 2) + 1)
-            xbi(5*(n + 2) + 0) = xbi(5*(n + 2) + 1)
-            xbr(5*(n + 2) + n + 1) = xbr(5*(n + 2) + n)
-            xbi(5*(n + 2) + n + 1) = xbi(5*(n + 2) + n)
-        end if
+        ! if (bubbles) then
+        !     xbr(5*(n + 2) + 0) = xbr(5*(n + 2) + 1)
+        !     xbi(5*(n + 2) + 0) = xbi(5*(n + 2) + 1)
+        !     xbr(5*(n + 2) + n + 1) = xbr(5*(n + 2) + n)
+        !     xbi(5*(n + 2) + n + 1) = xbi(5*(n + 2) + n)
+        ! end if
 
         xcr = 0d0
         xci = 0d0
-        do i = 1, nVar
+        do i = 1, 5
             do k = 0, n
                 xcr((i - 1)*(n + 1) + k) = 5d-1*(xbr((i - 1)*(n + 2) + k) + xbr((i - 1)*(n + 2) + k + 1))
                 xci((i - 1)*(n + 1) + k) = 5d-1*(xbi((i - 1)*(n + 2) + k) + xbi((i - 1)*(n + 2) + k + 1))
             end do
         end do
 
-        call write_eigvec(nVar,alpha,beta,xcr,xci)
+        call write_eigvec(alpha,beta,xcr,xci)
 
         ! Generate an instability wave
         do i = 0, m
@@ -937,24 +960,24 @@ contains
                     wave(3, i, j, k) = xcr(2*(n + 1) + j)*cos(ang) - xci(2*(n + 1) + j)*sin(ang) ! v
                     wave(4, i, j, k) = xcr(3*(n + 1) + j)*cos(ang) - xci(3*(n + 1) + j)*sin(ang) ! w
                     wave(5, i, j, k) = xcr(4*(n + 1) + j)*cos(ang) - xci(4*(n + 1) + j)*sin(ang) ! p
-                    if (bubbles) then
-                        wave(6, i, j, k) = xcr(5*(n + 1) + j)*cos(ang) - xci(5*(n + 1) + j)*sin(ang) ! n
-                    end if
+                    ! if (bubbles) then
+                    !     wave(6, i, j, k) = xcr(5*(n + 1) + j)*cos(ang) - xci(5*(n + 1) + j)*sin(ang) ! n
+                    ! end if
                 end do
             end do
         end do
 
     end subroutine s_generate_wave
 
-    subroutine write_eigvec(nVar,alpha,beta,vnr,vni)
-        integer, intent(in) :: nVar
-        real(kind(0d0)), dimension(0:nVar*(n + 1) - 1) :: vnr,vni
+
+    subroutine write_eigvec(alpha,beta,vnr,vni)
+        real(kind(0d0)), dimension(0:5*(n + 1) - 1) :: vnr,vni
         real(kind(0d0)) :: alpha,beta,a,b
         character*20 :: fname
         integer j
 
-        a = alpha*59d0/(2*pi)
-        b =  beta*59d0/(2*pi)
+        a = alpha*59d0/(2d0*pi)
+        b =  beta*59d0/(2d0*pi)
 
         if (beta .lt. 0) then
             write(fname,'(A,i1,A,i1,A)') 'eig_',int(a),'_n',int(abs(b)),'.dat'

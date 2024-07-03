@@ -42,9 +42,9 @@ fi
 u_c=$(echo "$u_c" | tr '[:upper:]' '[:lower:]')
 u_cg=$(echo "$u_cg" | tr '[:upper:]' '[:lower:]')
 
-if [ "$u_cg" == 'c' ] || [ "$u_cg" == 'cpu' ]; then
+if [ "$u_cg" '==' 'c' ] || [ "$u_cg" '==' 'cpu' ]; then
     CG='CPU'; cg='cpu'
-elif [ "$u_cg" == "g" ] || [ "$u_cg" == 'gpu' ]; then
+elif [ "$u_cg" '==' "g" ] || [ "$u_cg" '==' 'gpu' ]; then
     CG='GPU'; cg='gpu'
 fi
 

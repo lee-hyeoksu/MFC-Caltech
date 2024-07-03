@@ -206,10 +206,12 @@ contains
 
         real(kind(0d0)), dimension(2) :: Re !< Reynolds number
 
+        real(kind(0d0)) :: myE, dyn_pres, dalf
+
         integer :: i, j, k, l, q, ii !< Loop variables
         integer :: ndirs  !< Number of coordinate directions
 
-        real(kind(0d0)) :: err1, err2, err3 !< Error estimates for adaptive time stepping
+        real(kind(0d0)) :: err1, err2, err3, err4, err5 !< Error estimates for adaptive time stepping
         real(kind(0d0)) :: t_new !< Updated time step size
         real(kind(0d0)) :: h !< Time step size
         real(kind(0d0)), dimension(4) :: myR_tmp1, myV_tmp1, myR_tmp2, myV_tmp2, myR_tmp3, myV_tmp3!< Bubble radius, radial velocity, and radial acceleration for the inner loop
@@ -303,10 +305,18 @@ contains
                         B_tait = B_tait*(n_tait - 1)/n_tait ! make this the usual pi_inf
 
                         myRho = q_prim_vf(1)%sf(j, k, l)
+                        myE = q_cons_vf(E_idx)%sf(j, k, l)
                         myP = q_prim_vf(E_idx)%sf(j, k, l)
                         alf = q_prim_vf(alf_idx)%sf(j, k, l)
                         myR = q_prim_vf(rs(q))%sf(j, k, l)
                         myV = q_prim_vf(vs(q))%sf(j, k, l)
+
+                        dyn_pres = 0d0
+                        !$acc loop seq
+                        do ii = momxb, momxe
+                            dyn_pres = dyn_pres + 5d-1*q_prim_vf(ii)%sf(j, k, l)* &
+                                                    q_cons_vf(ii)%sf(j, k, l)
+                        end do
 
                         if (.not. polytropic) then
                             pb = q_prim_vf(ps(q))%sf(j, k, l)
@@ -337,6 +347,7 @@ contains
 
                                 ! Advancing one sub-step
                                 do while (.true.)
+                                    write(99,*) t_new, h 
                                     ! Advance one sub-step
                                     call s_advance_substep(myRho, myP, myR, myV, R0(q), &
                                                       pb, pbdot, alf, n_tait, B_tait, &
@@ -354,19 +365,31 @@ contains
                                                       bub_adv_src(j, k, l), divu%sf(j, k, l), 0.5d0*h, &
                                                       myR_tmp2, myV_tmp2, err3)
 
+                                    err4 = abs((myR_tmp1(4) - myR_tmp2(4))/myR_tmp1(4))
+                                    err5 = abs((myV_tmp1(4) - myV_tmp2(4))/myV_tmp1(4))
+                                    if (abs(myV_tmp1(4)) < 1e-12) err5 = 0d0
+
                                     ! Determine acceptance/rejection and update step size
                                     !   Rule 1: err1, err2, err3 < tol
                                     !   Rule 2: myR_tmp1(4) > 0d0
                                     !   Rule 3: abs((myR_tmp1(4) - myR_tmp2(4))/myR) < tol
                                     !   Rule 4: abs((myV_tmp1(4) - myV_tmp2(4))/myV) < tol
                                     if ((err1 <= 1d-4) .and. (err2 <= 1d-4) .and. (err3 <= 1d-4) &
-                                            .and. myR_tmp1(4) > 0d0 &
-                                            .and. abs((myR_tmp1(4) - myR_tmp2(4))/myR_tmp1(4)) < 1d-4 &
-                                            .and. abs((myV_tmp1(4) - myV_tmp2(4))/myV_tmp1(4)) < 1d-4) then
+                                        .and. (err4 < 1d-4) .and. (err5 < 1d-4) &
+                                        .and. myR_tmp1(4) > 0d0) then
+
                                         ! Accepted. Finalize the sub-step
+                                        t_new = t_new + h
+
+                                        ! Update pressure
+                                        dalf = nbub * (4d0 * pi/3d0) * (myR_tmp1(4)**3d0 - myR**3d0)
+                                        alf = alf + dalf
+                                        myE = myE + dalf * pi_infs(1) * (1d0/pi_fac - 1d0)
+                                        myP = 1d0/gammas(1) * ( 1d0 / (1d0 - alf) * (myE - dyn_pres) - pi_infs(1))
+
+                                        ! Update R and V
                                         myR = myR_tmp1(4)
                                         myV = myV_tmp1(4)
-                                        t_new = t_new + h
 
                                         ! Update step size for the next sub-step
                                         h = h*min(2d0, max(0.5d0, (1d-4/err1)**(1d0/3d0)))
@@ -527,8 +550,12 @@ contains
         ! Estimate error
         err_R = (-5d0*h/24d0)*(myV_tmp(2) + myV_tmp(3) - 2d0*myV_tmp(4)) &
                 /max(abs(myR_tmp(1)), abs(myR_tmp(4)))
+        if (max(abs(myR_tmp(1)), abs(myR_tmp(4))) < 1e-12) err_R = 0d0
+
         err_V = (-5d0*h/24d0)*(myA_tmp(2) + myA_tmp(3) - 2d0*myA_tmp(4)) &
                 /max(abs(myV_tmp(1)), abs(myV_tmp(4)))
+        if (max(abs(myV_tmp(1)), abs(myV_tmp(4))) < 1e-12) err_V = 0d0
+
         err = DSQRT((err_R**2d0 + err_V**2d0)/2d0)
 
     end subroutine s_advance_substep
