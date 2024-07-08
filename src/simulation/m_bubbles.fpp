@@ -117,6 +117,11 @@ contains
                         nR3bar = nR3bar + weight(i)*(q_cons_vf(rs(i))%sf(j, k, l))**3d0
                     end do
                     q_cons_vf(alf_idx)%sf(j, k, l) = (4d0*pi*nR3bar)/(3d0*q_cons_vf(n_idx)%sf(j, k, l)**2d0)
+
+                    if (q_cons_vf(alf_idx)%sf(j, k, l) /= q_cons_vf(alf_idx)%sf(j, k, l)) then
+                        print *, "NaN at s_comp_alpha_from_n"
+                        stop
+                    end if
                 end do
             end do
         end do
@@ -208,7 +213,7 @@ contains
 
         real(kind(0d0)) :: myE, dyn_pres, dalf
 
-        integer :: i, j, k, l, q, ii !< Loop variables
+        integer :: i, j, k, l, q, ii, iter1, iter2 !< Loop variables
         integer :: ndirs  !< Number of coordinate directions
 
         real(kind(0d0)) :: err1, err2, err3, err4, err5 !< Error estimates for adaptive time stepping
@@ -311,12 +316,12 @@ contains
                         myR = q_prim_vf(rs(q))%sf(j, k, l)
                         myV = q_prim_vf(vs(q))%sf(j, k, l)
 
-                        dyn_pres = 0d0
-                        !$acc loop seq
-                        do ii = momxb, momxe
-                            dyn_pres = dyn_pres + 5d-1*q_prim_vf(ii)%sf(j, k, l)* &
-                                                    q_cons_vf(ii)%sf(j, k, l)
-                        end do
+                        ! dyn_pres = 0d0
+                        ! !$acc loop seq
+                        ! do ii = momxb, momxe
+                        !     dyn_pres = dyn_pres + 5d-1*q_prim_vf(ii)%sf(j, k, l)* &
+                        !                             q_cons_vf(ii)%sf(j, k, l)
+                        ! end do
 
                         if (.not. polytropic) then
                             pb = q_prim_vf(ps(q))%sf(j, k, l)
@@ -339,6 +344,7 @@ contains
                                                       bub_adv_src(j, k, l), divu%sf(j, k, l), h)
 
                             ! Advancing one step
+                            iter1 = 1
                             t_new = 0d0
                             do while (.true.)
                                 if (t_new + h > 0.5d0*dt) then
@@ -346,8 +352,8 @@ contains
                                 end if
 
                                 ! Advancing one sub-step
+                                iter2 = 1
                                 do while (.true.)
-                                    write(99,*) t_new, h 
                                     ! Advance one sub-step
                                     call s_advance_substep(myRho, myP, myR, myV, R0(q), &
                                                       pb, pbdot, alf, n_tait, B_tait, &
@@ -382,10 +388,10 @@ contains
                                         t_new = t_new + h
 
                                         ! Update pressure
-                                        dalf = nbub * (4d0 * pi/3d0) * (myR_tmp1(4)**3d0 - myR**3d0)
-                                        alf = alf + dalf
-                                        myE = myE + dalf * pi_infs(1) * (1d0/pi_fac - 1d0)
-                                        myP = 1d0/gammas(1) * ( 1d0 / (1d0 - alf) * (myE - dyn_pres) - pi_infs(1))
+                                        ! dalf = nbub * (4d0 * pi/3d0) * (myR_tmp1(4)**3d0 - myR**3d0)
+                                        ! alf = alf + dalf
+                                        ! myE = myE + dalf * pi_infs(1) * (1d0/pi_fac - 1d0)
+                                        ! myP = 1d0/gammas(1) * ( 1d0 / (1d0 - alf) * (myE - dyn_pres) - pi_infs(1))
 
                                         ! Update R and V
                                         myR = myR_tmp1(4)
@@ -402,12 +408,19 @@ contains
                                         else
                                             h = 0.25d0*h
                                         end if
-
+                                        
+                                        iter2 = iter2 + 1
                                     end if
+                                    if (iter2 > 10) stop "iter2 > 10"
+
                                 end do
 
                                 ! Exit the loop if the final time reached dt
                                 if (t_new == 0.5d0*dt) exit
+                                
+                                iter1 = iter1 + 1
+
+                                if (iter1 > 100) stop "iter1 > 100"
 
                             end do
 

@@ -692,7 +692,7 @@ contains
             call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
         end if
 
-        if (adv_n) call s_comp_alpha_from_n(q_cons_ts(2)%vf)
+        ! if (adv_n) call s_comp_alpha_from_n(q_cons_ts(2)%vf)
 
         if (ib) then
             if (qbmm .and. .not. polytropic) then
@@ -768,7 +768,7 @@ contains
             call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
         end if
 
-        if (adv_n) call s_comp_alpha_from_n(q_cons_ts(2)%vf)
+        ! if (adv_n) call s_comp_alpha_from_n(q_cons_ts(2)%vf)
 
         if (ib) then
             if (qbmm .and. .not. polytropic) then
@@ -843,7 +843,7 @@ contains
             call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
         end if
 
-        if (adv_n) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
+        ! if (adv_n) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
 
         if (ib) then
             if (qbmm .and. .not. polytropic) then
@@ -879,14 +879,19 @@ contains
 
         call nvtxStartRange("Time_Step")
 
+        ! print *, t_step, "0", q_cons_ts(1)%vf(1)%sf(250, 0, 0), q_cons_ts(1)%vf(E_idx)%sf(250, 0, 0), q_cons_ts(1)%vf(alf_idx)%sf(250, 0, 0)
         ! Stage 1 of 3 =====================================================
         call s_adaptive_dt_bubble(t_step)
+        ! print *, t_step, "1", q_cons_ts(1)%vf(1)%sf(250, 0, 0), q_cons_ts(1)%vf(E_idx)%sf(250, 0, 0), q_cons_ts(1)%vf(alf_idx)%sf(250, 0, 0)
 
         ! Stage 2 of 3 =====================================================
         call s_3rd_order_tvd_rk(t_step, time_avg)
+        ! print *, t_step, "2", q_cons_ts(1)%vf(1)%sf(250, 0, 0), q_cons_ts(1)%vf(E_idx)%sf(250, 0, 0), q_cons_ts(1)%vf(alf_idx)%sf(250, 0, 0)
 
         ! Stage 3 of 3 =====================================================
         call s_adaptive_dt_bubble(t_step)
+        ! print *, t_step, "3", q_cons_ts(1)%vf(1)%sf(250, 0, 0), q_cons_ts(1)%vf(E_idx)%sf(250, 0, 0), q_cons_ts(1)%vf(alf_idx)%sf(250, 0, 0)
+        ! print *, " "
 
         call nvtxEndRange
 
@@ -919,9 +924,9 @@ contains
 
         call s_compute_bubble_source(q_cons_ts(1)%vf, q_prim_vf, t_step, rhs_vf)
 
-        call s_comp_alpha_from_n(q_cons_ts(1)%vf)
+        ! call s_comp_alpha_from_n(q_cons_ts(1)%vf)
 
-        if (artificial_Ma) call s_update_energy(q_cons_ts(1)%vf, q_prim_vf)
+        ! if (artificial_Ma) call s_update_energy(q_cons_ts(1)%vf, q_prim_vf)
 
     end subroutine s_adaptive_dt_bubble ! ------------------------------
 
@@ -953,12 +958,14 @@ contains
     subroutine s_update_energy(q_cons_vf, q_prim_vf)
         type(scalar_field), dimension(sys_size), intent(INOUT) :: q_cons_vf
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
-        real(kind(0d0)) :: Pi_inf_true, Pi_inf_arti
-        real(kind(0d0)) :: alf_old, alf_new
+        real(kind(0d0)) :: Gamma_l, Pi_inf_true, Pi_inf_arti
+        real(kind(0d0)) :: alf_old, alf_new, dalf
+        real(kind(0d0)) :: pres_old, dpres
         integer(kind(0d0)) :: i, j, k, l
 
         Pi_inf_arti = pi_infs(1)
         Pi_inf_true = pi_infs(1)/pi_fac
+        Gamma_l = gammas(1)
 
         !$acc parallel loop collapse(3) gang vector default(present)
         do l = 0, p
@@ -966,12 +973,16 @@ contains
                 do j = 0, m
                     alf_old = q_prim_vf(alf_idx)%sf(j, k, l)
                     alf_new = q_cons_vf(alf_idx)%sf(j, k, l)
+                    dalf = alf_new - alf_old
 
                     q_cons_vf(E_idx)%sf(j, k, l) = q_cons_vf(E_idx)%sf(j, k, l) + &
-                                                  (alf_new - alf_old)*(Pi_inf_true - Pi_inf_arti)
+                                                  dalf*(Pi_inf_true - Pi_inf_arti)
                 end do
             end do
         end do
+
+        call s_release_aM_pressure()
+
     end subroutine s_update_energy
 
     !> This subroutine saves the temporary q_prim_vf vector

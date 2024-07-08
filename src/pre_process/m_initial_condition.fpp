@@ -478,11 +478,11 @@ contains
                         q_prim_vf(mom_idx%beg + 2)%sf(i, j, k) = q_prim_vf(mom_idx%beg + 2)%sf(i, j, k) + wave(4, i, j, k) / uratio ! w
                     end if
                     q_prim_vf(E_idx)%sf(i, j, k) = q_prim_vf(E_idx)%sf(i, j, k) + wave(5, i, j, k)  / uratio**2 ! p
-                    if (bubbles) then
-                        call s_compute_equilibrium_radius(q_prim_vf(E_idx)%sf(i, j, k), q_prim_vf(bub_idx%rs(1))%sf(i, j, k))
-                        ! q_prim_vf(bub_idx%rs(1))%sf(i, j, k) = ((Ca + 2d0 / Web)/(q_prim_vf(E_idx)%sf(i, j, k) - 1d0 + Ca))**(1/(3d0*gam))
-                        q_prim_vf(alf_idx)%sf(i, j, k) = q_prim_vf(n_idx)%sf(i, j, k)*(4d0*pi/3d0)*q_prim_vf(bub_idx%rs(1))%sf(i, j, k)**3d0
-                    end if
+                    ! if (bubbles) then
+                    !     call s_compute_equilibrium_radius(q_prim_vf(E_idx)%sf(i, j, k), q_prim_vf(bub_idx%rs(1))%sf(i, j, k))
+                    !     ! q_prim_vf(bub_idx%rs(1))%sf(i, j, k) = ((Ca + 2d0 / Web)/(q_prim_vf(E_idx)%sf(i, j, k) - 1d0 + Ca))**(1/(3d0*gam))
+                    !     q_prim_vf(alf_idx)%sf(i, j, k) = q_prim_vf(n_idx)%sf(i, j, k)*(4d0*pi/3d0)*q_prim_vf(bub_idx%rs(1))%sf(i, j, k)**3d0
+                    ! end if
                 end do
             end do
         end do
