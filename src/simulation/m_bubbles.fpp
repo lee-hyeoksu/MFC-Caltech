@@ -313,8 +313,8 @@ contains
                         myR = q_prim_vf(rs(q))%sf(j, k, l)
                         myV = q_prim_vf(vs(q))%sf(j, k, l)
 
+                        myRho = q_prim_vf(1)%sf(j, k, l)
                         myP = q_prim_vf(E_idx)%sf(j, k, l)
-                        myRho = q_prim_vf(1)%sf(j, k, l) / (1d0 - alf)
 
                         if (.not. polytropic) then
                             pb = q_prim_vf(ps(q))%sf(j, k, l)

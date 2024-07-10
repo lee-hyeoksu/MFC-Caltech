@@ -148,7 +148,7 @@ contains
         else if ((model_eqns /= 4) .and. bubbles .and. (no_energy_eq .eqv. .false.)) then
             pres = ((energy - dyn_p)/(1.d0 - alf) - pi_inf - qv)/gamma
         else if ((model_eqns /= 4) .and. bubbles .and. no_energy_eq) then
-            pres = (cvt * rho / (1d0 - alf) - gamma * pi_inf / (gamma + 1d0)) / gamma
+            pres = (cvt * rho / (1d0 - alf) - gamma * pi_inf/pi_fac / (gamma + 1d0)) / gamma
         else
             pres = (pref + pi_inf)* &
                    (energy/ &

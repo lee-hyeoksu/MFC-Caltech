@@ -491,6 +491,7 @@ contains
                         if (no_energy_eq) then 
                             call s_compute_equilibrium_state(q_prim_vf(cont_idx%beg)%sf(i, j, k), &
                                                             q_prim_vf(E_idx)%sf(i, j, k), &
+                                                            q_prim_vf(n_idx)%sf(i, j, k), &
                                                             q_prim_vf(alf_idx)%sf(i, j, k), &
                                                             q_prim_vf(bub_idx%rs(1))%sf(i, j, k))
                         else 
@@ -504,10 +505,14 @@ contains
 
     end subroutine s_superposition_instability_wave ! ----------------------
 
-    subroutine s_compute_equilibrium_state(rho, pres, alf, radius)
+    subroutine s_compute_equilibrium_state(rho, pres, nbub, alf, radius)
         real(kind(0d0)), intent(in) :: rho
-        real(kind(0d0)), intent(inout) :: alf
-        real(kind(0d0)), intent(out) :: pres, radius
+        ! real(kind(0d0)), intent(inout) :: alf
+        ! real(kind(0d0)), intent(out) :: pres
+        real(kind(0d0)), intent(out) :: alf
+        real(kind(0d0)), intent(in) :: pres
+        real(kind(0d0)), intent(in) :: nbub
+        real(kind(0d0)), intent(out) :: radius
         real(kind(0d0)) :: f0, f1
         real(kind(0d0)) :: gam, pi_inf
         real(kind(0d0)) :: gam_sm
@@ -519,14 +524,15 @@ contains
 
         ! Initial guess
         radius = 1d0
-        call s_compute_pressure(0d0, alf, 0d0, pi_infs(1), gammas(1), rho, 0d0, pres)
+        ! call s_compute_pressure(0d0, alf, 0d0, pi_infs(1), gammas(1), rho, 0d0, pres)
 
         ! Loop
         ii = 1
         do while (.true.)
 
             f0 = (Ca + 2d0/Web)*(1d0/radius)**(3d0*gam_sm) - 2d0/(Web*radius) + 1d0 - Ca - pres
-            f1 = -3d0*gam_sm*(Ca + 2d0/Web)*(1d0/radius)**(3d0*gam_sm+1d0) + 2d0/(Web*radius**2d0) - (pres + pi_inf)/(1d0 - alf)*3d0*alf/radius
+            ! f1 = -3d0*gam_sm*(Ca + 2d0/Web)*(1d0/radius)**(3d0*gam_sm+1d0) + 2d0/(Web*radius**2d0) - (pres + pi_inf)/(1d0 - alf)*3d0*alf/radius
+            f1 = -3d0*gam_sm*(Ca + 2d0/Web)*(1d0/radius)**(3d0*gam_sm+1d0) + 2d0/(Web*radius**2d0)
 
             if (abs(f0) .le. 1e-9) then
                 exit
@@ -539,13 +545,15 @@ contains
             end if
 
             ! Update variables
-            alf = alf / radius**3
+            ! alf = alf / radius**3
             radius = radius - f0/f1
-            alf = alf * radius**3
-            call s_compute_pressure(0d0, alf, 0d0, pi_infs(1), gammas(1), rho, 0d0, pres)
+            ! alf = alf * radius**3
+            ! call s_compute_pressure(0d0, alf, 0d0, pi_infs(1), gammas(1), rho, 0d0, pres)
 
             ii = ii + 1
         end do
+
+        alf = nbub * (4d0*pi/3d0) * radius**3d0
 
     end subroutine s_compute_equilibrium_state
 
