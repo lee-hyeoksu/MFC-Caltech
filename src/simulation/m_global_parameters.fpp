@@ -367,6 +367,8 @@ module m_global_parameters
     integer :: nmomtot   !< Total number of carried moments moments/transport equations
     integer :: R0_type
 
+    logical :: no_energy_eq
+    real(kind(0d0)) :: cvt
     logical :: artificial_Ma
     real(kind(0d0)) :: pi_fac   !< Factor for artificial pi_inf
 
@@ -374,7 +376,7 @@ module m_global_parameters
         !$acc declare create(nb)
     #:endif
 
-!$acc declare create(R0ref, Ca, Web, Re_inv, bubbles, polytropic, polydisperse, qbmm, nmomsp, nmomtot, R0_type, bubble_model, thermal, poly_sigma, adv_n, adap_dt, artificial_Ma, pi_fac)
+!$acc declare create(R0ref, Ca, Web, Re_inv, bubbles, polytropic, polydisperse, qbmm, nmomsp, nmomtot, R0_type, bubble_model, thermal, poly_sigma, adv_n, adap_dt, no_energy_eq, cvt, artificial_Ma, pi_fac)
 
 #ifdef CRAY_ACC_WAR
     @:CRAY_DECLARE_GLOBAL(type(scalar_field), dimension(:), mom_sp)
@@ -572,6 +574,8 @@ contains
         adv_n = .false.
         adap_dt = .false.
 
+        no_energy_eq = .false.
+        cvt = dflt_real
         artificial_Ma = .false.
         pi_fac = 1d0
 
@@ -1024,7 +1028,7 @@ contains
         intxb = internalEnergies_idx%beg
         intxe = internalEnergies_idx%end
 
-        !$acc update device(momxb, momxe, advxb, advxe, contxb, contxe, bubxb, bubxe, intxb, intxe, sys_size, buff_size, E_idx, alf_idx, n_idx, adv_n, adap_dt, artificial_Ma, pi_fac, strxb, strxe)
+        !$acc update device(momxb, momxe, advxb, advxe, contxb, contxe, bubxb, bubxe, intxb, intxe, sys_size, buff_size, E_idx, alf_idx, n_idx, adv_n, adap_dt, no_energy_eq, cvt, artificial_Ma, pi_fac, strxb, strxe)
         !$acc update device(m, n, p)
 
         !$acc update device(alt_soundspeed, monopole, num_mono)

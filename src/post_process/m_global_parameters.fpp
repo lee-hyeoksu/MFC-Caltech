@@ -244,6 +244,9 @@ module m_global_parameters
     real(kind(0d0)) :: sigma
     !> #}
 
+    logical :: no_energy_eq
+    real(kind(0d0)) :: cvt
+
     !> @name Index variables used for m_variables_conversion
     !> @{
     integer :: momxb, momxe
@@ -353,6 +356,9 @@ contains
         sigR = dflt_real
         sigma = dflt_real
         adv_n = .false.
+
+        no_energy_eq = .false.
+        cvt = dflt_real
 
     end subroutine s_assign_default_values_to_user_inputs ! ----------------
 

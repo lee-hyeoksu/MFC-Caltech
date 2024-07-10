@@ -39,6 +39,8 @@ COMMON = {
     'relax_model': ParamType.INT,
     'sigma': ParamType.REAL,
     'adv_n': ParamType.LOG,
+    'no_energy_eq': ParamType.LOG,
+    'cvt': ParamType.REAL,
 }
 
 PRE_PROCESS = COMMON.copy()

@@ -692,7 +692,7 @@ contains
             call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
         end if
 
-        ! if (adv_n) call s_comp_alpha_from_n(q_cons_ts(2)%vf)
+        if (adv_n) call s_comp_alpha_from_n(q_cons_ts(2)%vf)
 
         if (ib) then
             if (qbmm .and. .not. polytropic) then
@@ -768,7 +768,7 @@ contains
             call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
         end if
 
-        ! if (adv_n) call s_comp_alpha_from_n(q_cons_ts(2)%vf)
+        if (adv_n) call s_comp_alpha_from_n(q_cons_ts(2)%vf)
 
         if (ib) then
             if (qbmm .and. .not. polytropic) then
@@ -843,7 +843,7 @@ contains
             call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
         end if
 
-        ! if (adv_n) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
+        if (adv_n) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
 
         if (ib) then
             if (qbmm .and. .not. polytropic) then
@@ -879,19 +879,14 @@ contains
 
         call nvtxStartRange("Time_Step")
 
-        ! print *, t_step, "0", q_cons_ts(1)%vf(1)%sf(250, 0, 0), q_cons_ts(1)%vf(E_idx)%sf(250, 0, 0), q_cons_ts(1)%vf(alf_idx)%sf(250, 0, 0)
         ! Stage 1 of 3 =====================================================
         call s_adaptive_dt_bubble(t_step)
-        ! print *, t_step, "1", q_cons_ts(1)%vf(1)%sf(250, 0, 0), q_cons_ts(1)%vf(E_idx)%sf(250, 0, 0), q_cons_ts(1)%vf(alf_idx)%sf(250, 0, 0)
 
         ! Stage 2 of 3 =====================================================
         call s_3rd_order_tvd_rk(t_step, time_avg)
-        ! print *, t_step, "2", q_cons_ts(1)%vf(1)%sf(250, 0, 0), q_cons_ts(1)%vf(E_idx)%sf(250, 0, 0), q_cons_ts(1)%vf(alf_idx)%sf(250, 0, 0)
 
         ! Stage 3 of 3 =====================================================
         call s_adaptive_dt_bubble(t_step)
-        ! print *, t_step, "3", q_cons_ts(1)%vf(1)%sf(250, 0, 0), q_cons_ts(1)%vf(E_idx)%sf(250, 0, 0), q_cons_ts(1)%vf(alf_idx)%sf(250, 0, 0)
-        ! print *, " "
 
         call nvtxEndRange
 
@@ -924,7 +919,7 @@ contains
 
         call s_compute_bubble_source(q_cons_ts(1)%vf, q_prim_vf, t_step, rhs_vf)
 
-        ! call s_comp_alpha_from_n(q_cons_ts(1)%vf)
+        call s_comp_alpha_from_n(q_cons_ts(1)%vf)
 
         ! if (artificial_Ma) call s_update_energy(q_cons_ts(1)%vf, q_prim_vf)
 
@@ -980,8 +975,6 @@ contains
                 end do
             end do
         end do
-
-        call s_release_aM_pressure()
 
     end subroutine s_update_energy
 

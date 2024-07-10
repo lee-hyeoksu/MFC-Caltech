@@ -145,8 +145,10 @@ contains
 
         if ((model_eqns /= 4) .and. (bubbles .neqv. .true.)) then
             pres = (energy - dyn_p - pi_inf - qv)/gamma
-        else if ((model_eqns /= 4) .and. bubbles) then
+        else if ((model_eqns /= 4) .and. bubbles .and. (no_energy_eq .eqv. .false.)) then
             pres = ((energy - dyn_p)/(1.d0 - alf) - pi_inf - qv)/gamma
+        else if ((model_eqns /= 4) .and. bubbles .and. no_energy_eq) then
+            pres = (cvt * rho / (1d0 - alf) - gamma * pi_inf / (gamma + 1d0)) / gamma
         else
             pres = (pref + pi_inf)* &
                    (energy/ &
@@ -1097,7 +1099,7 @@ contains
                         q_cons_vf(E_idx)%sf(j, k, l) = &
                             gamma*q_prim_vf(E_idx)%sf(j, k, l) + dyn_pres + pi_inf &
                             + qv
-                    else if ((model_eqns /= 4) .and. (bubbles)) then
+                    else if ((model_eqns /= 4) .and. (bubbles) .and. (no_energy_eq .eqv. .false.)) then
                         ! \tilde{E} = dyn_pres + (1-\alf)(\Gamma p_l + \Pi_inf)
                         q_cons_vf(E_idx)%sf(j, k, l) = dyn_pres + &
                                                        (1.d0 - q_prim_vf(alf_idx)%sf(j, k, l))* &
