@@ -41,6 +41,8 @@ COMMON = {
     'adv_n': ParamType.LOG,
     'no_energy_eq': ParamType.LOG,
     'cvt': ParamType.REAL,
+    'cvt_fac': ParamType.REAL,
+    'pi_fac': ParamType.REAL,
 }
 
 PRE_PROCESS = COMMON.copy()
@@ -66,7 +68,6 @@ PRE_PROCESS.update({
     'rhoRV': ParamType.REAL,
     'palpha_eps': ParamType.REAL,
     'ptgalpha_eps': ParamType.REAL,
-    'pi_fac': ParamType.REAL,
     'ib': ParamType.LOG,
     'num_ibs': ParamType.INT,
 })
@@ -188,7 +189,6 @@ SIMULATION.update({
     'rdma_mpi': ParamType.LOG,
     'palpha_eps': ParamType.REAL,
     'ptgalpha_eps': ParamType.REAL,
-    'pi_fac': ParamType.REAL,
     'adap_dt': ParamType.LOG,
     'artificial_Ma': ParamType.LOG,
     'apc': ParamType.LOG,

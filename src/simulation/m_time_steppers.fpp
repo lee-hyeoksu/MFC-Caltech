@@ -279,6 +279,15 @@ contains
             @:ACC_SETUP_SFs(q_prim_vf(n_idx))
         end if
 
+        if (no_energy_eq) then
+            @:ALLOCATE(cvt_true(ix_t%beg:ix_t%end, &
+                                iy_t%beg:iy_t%end, &
+                                iz_t%beg:iz_t%end))
+            @:ALLOCATE(cvt_arti(ix_t%beg:ix_t%end, &
+                                iy_t%beg:iy_t%end, &
+                                iz_t%beg:iz_t%end))
+        end if
+
         ! Allocating the cell-average RHS variables
         @:ALLOCATE_GLOBAL(rhs_vf(1:sys_size))
 
@@ -642,6 +651,15 @@ contains
                         q_cons_ts(2)%vf(i)%sf(j, k, l) = &
                             q_cons_ts(1)%vf(i)%sf(j, k, l) &
                             + dt*rhs_vf(i)%sf(j, k, l)
+
+                        if (rhs_vf(i)%sf(j, k, l) /= rhs_vf(i)%sf(j, k, l)) then
+                            print *, "NaN at rhs1", i, j, k, l
+                            print *, (q_cons_ts(2)%vf(q)%sf(j, k, l), q=1,sys_size)
+                            print *, (q_cons_ts(1)%vf(q)%sf(j, k, l), q=1,sys_size)
+                            print *, (rhs_vf(q)%sf(j, k, l), q=1,sys_size)
+                            print *, cvt_arti(j, k, l)
+                            stop
+                        end if 
                     end do
                 end do
             end do
@@ -717,6 +735,11 @@ contains
                             (3d0*q_cons_ts(1)%vf(i)%sf(j, k, l) &
                              + q_cons_ts(2)%vf(i)%sf(j, k, l) &
                              + dt*rhs_vf(i)%sf(j, k, l))/4d0
+                        if (rhs_vf(i)%sf(j, k, l) /= rhs_vf(i)%sf(j, k, l)) then
+                            print *, "NaN at rhs2", i, j, k, l
+                            print *, (q_cons_ts(2)%vf(q)%sf(j, k, l), q=1,sys_size)
+                            stop
+                        end if 
                     end do
                 end do
             end do
@@ -792,6 +815,11 @@ contains
                             (q_cons_ts(1)%vf(i)%sf(j, k, l) &
                              + 2d0*q_cons_ts(2)%vf(i)%sf(j, k, l) &
                              + 2d0*dt*rhs_vf(i)%sf(j, k, l))/3d0
+                        if (rhs_vf(i)%sf(j, k, l) /= rhs_vf(i)%sf(j, k, l)) then
+                            print *, "NaN at rhs3", i, j, k, l
+                            print *, (q_cons_ts(1)%vf(q)%sf(j, k, l), q=1,sys_size)
+                            stop
+                        end if
                     end do
                 end do
             end do
@@ -879,14 +907,20 @@ contains
 
         call nvtxStartRange("Time_Step")
 
+        j = 17; k = 124; l = 0
+        print *, "0", (q_cons_ts(1)%vf(i)%sf(j, k, l), i=1,sys_size), cvt_arti(j, k, l)
+
         ! Stage 1 of 3 =====================================================
         call s_adaptive_dt_bubble(t_step)
+        print *, "1", (q_cons_ts(1)%vf(i)%sf(j, k, l), i=1,sys_size), cvt_arti(j, k, l)
 
         ! Stage 2 of 3 =====================================================
         call s_3rd_order_tvd_rk(t_step, time_avg)
+        print *, "2", (q_cons_ts(1)%vf(i)%sf(j, k, l), i=1,sys_size), cvt_arti(j, k, l)
 
         ! Stage 3 of 3 =====================================================
         call s_adaptive_dt_bubble(t_step)
+        print *, "3", (q_cons_ts(1)%vf(i)%sf(j, k, l), i=1,sys_size), cvt_arti(j, k, l)
 
         call nvtxEndRange
 
@@ -910,7 +944,7 @@ contains
         integer :: i, j, k, l, q !< Generic loop iterator
 
         ix%beg = 0; iy%beg = 0; iz%beg = 0
-        ix%end = m; iy%end = n; iz%end = p
+        ix%end = m; iy%end = n; iz%end = p        
         call s_convert_conservative_to_primitive_variables( &
             q_cons_ts(1)%vf, &
             q_prim_vf, &
@@ -921,9 +955,65 @@ contains
 
         call s_comp_alpha_from_n(q_cons_ts(1)%vf)
 
-        ! if (artificial_Ma) call s_update_energy(q_cons_ts(1)%vf, q_prim_vf)
+        ! if (no_energy_eq) call s_update_cvt(q_cons_ts(1)%vf)
 
     end subroutine s_adaptive_dt_bubble ! ------------------------------
+
+
+    subroutine s_initialize_cvt(q_cons_vf)
+        type(scalar_field), dimension(1:sys_size), intent(IN) :: q_cons_vf
+        real(kind(0d0)) :: Gamma, Pi_inf_true, Pi_inf_arti
+        real(kind(0d0)) :: alf, rho, pres
+
+        integer :: i, j, k, l
+
+        Gamma = gammas(1)
+        Pi_inf_true = pi_infs(1)/pi_fac    ! True pi_inf
+        Pi_inf_arti = pi_infs(1)    ! Artificial pi_inf
+
+        !$acc parallel loop collapse(3) gang vector default(present)
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    rho = q_cons_vf(cont_idx%beg)%sf(j, k, l)
+                    alf = q_cons_vf(alf_idx)%sf(j, k, l)
+                    pres = q_cons_vf(E_idx)%sf(j, k, l)
+                    cvt_true(j, k, l) = (1d0 - alf)/rho * (Gamma * pres + Gamma*Pi_inf_true/(Gamma + 1d0))
+                    cvt_arti(j, k, l) = (1d0 - alf)/rho * (Gamma * pres + Gamma*Pi_inf_arti/(Gamma + 1d0))
+                end do
+            end do
+        end do
+
+    end subroutine s_initialize_cvt
+
+
+    subroutine s_update_cvt(q_cons_vf)
+
+        type(scalar_field), dimension(1:sys_size), intent(IN) :: q_cons_vf
+
+        real(kind(0d0)) :: Gamma, Pi_inf_true, Pi_inf_arti
+        real(kind(0d0)) :: alf, rho
+
+        integer :: i, j, k, l
+
+        Gamma = gammas(1)
+        Pi_inf_true = pi_infs(1)/pi_fac    ! True pi_inf
+        Pi_inf_arti = pi_infs(1)    ! Artificial pi_inf
+
+        !$acc parallel loop collapse(3) gang vector default(present)
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    rho = q_cons_vf(cont_idx%beg)%sf(j, k, l)
+                    alf = q_cons_vf(alf_idx)%sf(j, k, l)
+                    cvt_arti(j, k, l) = cvt_true(j, k, l) - (1d0 - alf)/rho * (Gamma/(Gamma + 1d0)) * (Pi_inf_true - Pi_inf_arti)
+                    ! if ( j == 238 .and. k == 116 ) print *, "s_update_cvt", cvt_true(j, k, l), alf, rho, Gamma, Pi_inf_true, Pi_inf_arti
+                end do
+            end do
+        end do
+
+    end subroutine s_update_cvt
+
 
     !> This subroutine applies the body forces source term at each
         !! Runge-Kutta stage
@@ -948,35 +1038,6 @@ contains
             end do
         end do
     end subroutine s_apply_bodyforces
-
-    !> 
-    subroutine s_update_energy(q_cons_vf, q_prim_vf)
-        type(scalar_field), dimension(sys_size), intent(INOUT) :: q_cons_vf
-        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
-        real(kind(0d0)) :: Gamma_l, Pi_inf_true, Pi_inf_arti
-        real(kind(0d0)) :: alf_old, alf_new, dalf
-        real(kind(0d0)) :: pres_old, dpres
-        integer(kind(0d0)) :: i, j, k, l
-
-        Pi_inf_arti = pi_infs(1)
-        Pi_inf_true = pi_infs(1)/pi_fac
-        Gamma_l = gammas(1)
-
-        !$acc parallel loop collapse(3) gang vector default(present)
-        do l = 0, p
-            do k = 0, n
-                do j = 0, m
-                    alf_old = q_prim_vf(alf_idx)%sf(j, k, l)
-                    alf_new = q_cons_vf(alf_idx)%sf(j, k, l)
-                    dalf = alf_new - alf_old
-
-                    q_cons_vf(E_idx)%sf(j, k, l) = q_cons_vf(E_idx)%sf(j, k, l) + &
-                                                  dalf*(Pi_inf_true - Pi_inf_arti)
-                end do
-            end do
-        end do
-
-    end subroutine s_update_energy
 
     !> This subroutine saves the temporary q_prim_vf vector
         !!      into the q_prim_ts vector that is then used in p_main

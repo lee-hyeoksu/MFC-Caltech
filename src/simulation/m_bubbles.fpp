@@ -119,7 +119,7 @@ contains
                     q_cons_vf(alf_idx)%sf(j, k, l) = (4d0*pi*nR3bar)/(3d0*q_cons_vf(n_idx)%sf(j, k, l)**2d0)
 
                     if (q_cons_vf(alf_idx)%sf(j, k, l) /= q_cons_vf(alf_idx)%sf(j, k, l)) then
-                        print *, "NaN at s_comp_alpha_from_n"
+                        print *, "NaN at s_comp_alpha_from_n", j, k, l, q_cons_vf(alf_idx)%sf(j, k, l), q_cons_vf(n_idx)%sf(j, k, l), q_cons_vf(rs(1))%sf(j, k, l)
                         stop
                     end if
                 end do
@@ -369,18 +369,21 @@ contains
                                     if (abs(myV_tmp1(4)) < 1e-12) err5 = 0d0
 
                                     ! Determine acceptance/rejection and update step size
-                                    !   Rule 1: err1, err2, err3 < tol
+                                    !   Rule 1: err1, err2, err3, err4, err5 < tol
                                     !   Rule 2: myR_tmp1(4) > 0d0
-                                    !   Rule 3: abs((myR_tmp1(4) - myR_tmp2(4))/myR) < tol
-                                    !   Rule 4: abs((myV_tmp1(4) - myV_tmp2(4))/myV) < tol
                                     if ((err1 <= 1d-4) .and. (err2 <= 1d-4) .and. (err3 <= 1d-4) &
                                         .and. (err4 < 1d-4) .and. (err5 < 1d-4) &
                                         .and. myR_tmp1(4) > 0d0) then
 
                                         ! Accepted. Finalize the sub-step
+                                        t_new = t_new + h
+                                        
                                         myR = myR_tmp1(4)
                                         myV = myV_tmp1(4)
-                                        t_new = t_new + h
+                                        
+                                        alf = nbub*(4d0*pi/3d0)*myR**3
+
+                                        myP = myRho/(1d0 - alf)*(cvt/cvt_fac)/gammas(1) - pi_infs(1)/pi_fac/(gammas(1)+1d0)
 
                                         ! Update step size for the next sub-step
                                         h = h*min(2d0, max(0.5d0, (1d-4/err1)**(1d0/3d0)))
@@ -396,8 +399,10 @@ contains
                                         
                                         iter2 = iter2 + 1
                                     end if
-                                    if (iter2 > 100) stop "iter2 > 100"
-
+                                    if (iter2 > 100) then
+                                        print *, j, k, l
+                                        stop "iter2 > 100"
+                                    end if 
                                 end do
 
                                 ! Exit the loop if the final time reached dt
@@ -405,7 +410,10 @@ contains
                                 
                                 iter1 = iter1 + 1
 
-                                if (iter1 > 100) stop "iter1 > 100"
+                                if (iter1 > 100) then
+                                    print *, j, k, l
+                                    stop "iter1 > 100"
+                                end if 
 
                             end do
 

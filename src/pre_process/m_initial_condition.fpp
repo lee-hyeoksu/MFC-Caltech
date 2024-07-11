@@ -406,10 +406,11 @@ contains
         real(kind(0d0)), dimension(nvar, 0:m, 0:n, 0:p) :: wave, wave1, wave2, wave_tmp
         real(kind(0d0)) :: xratio, uratio
         real(kind(0d0)), dimension(6) :: shift
-        real(kind(0d0)) :: gam, gam_sm, pi_inf_sm
+        real(kind(0d0)) :: gam, pi_inf
         integer :: i, j, k
 
-        gam = 1d0 + 1d0/fluid_pp(1)%gamma
+        gam = 1d0 + 1d0/gammas(1)
+        pi_inf = pi_infs(1)/gam*(gam - 1d0) 
 
         xratio = 59d0/patch_icpp(1)%length_y ! input scale / mixing layer scale
         uratio = 1d0/patch_icpp(1)%vel(1) ! input scale / mixing layer scale
@@ -485,15 +486,26 @@ contains
                     if (p > 0) then
                         q_prim_vf(mom_idx%beg + 2)%sf(i, j, k) = q_prim_vf(mom_idx%beg + 2)%sf(i, j, k) + wave(4, i, j, k) / uratio ! w
                     end if
+
                     q_prim_vf(E_idx)%sf(i, j, k) = q_prim_vf(E_idx)%sf(i, j, k) + wave(5, i, j, k)  / uratio**2 ! p
 
                     if (bubbles) then
                         if (no_energy_eq) then 
+                            ! write(99,*) q_prim_vf(cont_idx%beg)%sf(i, j, k), q_prim_vf(E_idx)%sf(i, j, k), q_prim_vf(alf_idx)%sf(i, j, k), (q_prim_vf(E_idx)%sf(i, j, k) + pi_inf)/(gam - 1d0) - q_prim_vf(cont_idx%beg)%sf(i, j, k)*cvt/(1d0 - q_prim_vf(alf_idx)%sf(i, j, k))
+                            ! print *, i, j, k, q_prim_vf(cont_idx%beg)%sf(i, j, k), q_prim_vf(E_idx)%sf(i, j, k), q_prim_vf(n_idx)%sf(i, j, k),q_prim_vf(alf_idx)%sf(i, j, k), q_prim_vf(bub_idx%rs(1))%sf(i, j, k)
                             call s_compute_equilibrium_state(q_prim_vf(cont_idx%beg)%sf(i, j, k), &
                                                             q_prim_vf(E_idx)%sf(i, j, k), &
                                                             q_prim_vf(n_idx)%sf(i, j, k), &
                                                             q_prim_vf(alf_idx)%sf(i, j, k), &
                                                             q_prim_vf(bub_idx%rs(1))%sf(i, j, k))
+                            ! call s_compute_pressure(0d0, q_prim_vf(alf_idx)%sf(i, j, k), 0d0, pi_infs(1), gammas(1), &
+                            !                         q_prim_vf(cont_idx%beg)%sf(i, j, k), 0d0, q_prim_vf(E_idx)%sf(i, j, k))
+                            ! write(99,*) i, j, q_prim_vf(alf_idx)%sf(i, j, k), q_prim_vf(cont_idx%beg)%sf(i, j, k), q_prim_vf(E_idx)%sf(i, j, k)
+                            ! q_prim_vf(n_idx)%sf(i, j, k) = (1d0 - (gam - 1d0)*q_prim_vf(cont_idx%beg)%sf(i, j, k)*cvt / (q_prim_vf(E_idx)%sf(i, j, k) + pi_inf))/(4d0*pi/3d0)
+                            ! q_prim_vf(E_idx)%sf(i, j, k) = (gam - 1d0)*q_prim_vf(cont_idx%beg)%sf(i, j, k)*cvt/(1d0 - q_prim_vf(alf_idx)%sf(i, j, k)) - pi_inf
+                            ! if ( q_prim_vf(n_idx)%sf(i, j, k) < 0d0) then
+                            !     print *, gam, pi_inf, cvt, q_prim_vf(cont_idx%beg)%sf(i, j, k), q_prim_vf(E_idx)%sf(i, j, k)
+                            ! end if
                         else 
                             q_prim_vf(alf_idx)%sf(i, j, k) = q_prim_vf(n_idx)%sf(i, j, k)*(4d0*pi/3d0)*q_prim_vf(bub_idx%rs(1))%sf(i, j, k)**3d0
                         end if
@@ -509,51 +521,64 @@ contains
         real(kind(0d0)), intent(in) :: rho
         ! real(kind(0d0)), intent(inout) :: alf
         ! real(kind(0d0)), intent(out) :: pres
-        real(kind(0d0)), intent(out) :: alf
-        real(kind(0d0)), intent(in) :: pres
+        real(kind(0d0)), intent(inout) :: alf
+        real(kind(0d0)), intent(inout) :: pres
         real(kind(0d0)), intent(in) :: nbub
-        real(kind(0d0)), intent(out) :: radius
-        real(kind(0d0)) :: f0, f1
+        real(kind(0d0)), intent(inout) :: radius
+        real(kind(0d0)) :: f0, g0, fp, fr, gp, gr
         real(kind(0d0)) :: gam, pi_inf
-        real(kind(0d0)) :: gam_sm
-        integer :: ii
+        real(kind(0d0)) :: gam_b
+        integer :: ii, jj
 
         gam = 1d0 + 1d0/gammas(1)
         pi_inf = pi_infs(1)/gam*(gam - 1d0)
-        gam_sm = 1d0 + 1d0/fluid_pp(num_fluids + 1)%gamma
-
-        ! Initial guess
-        radius = 1d0
-        ! call s_compute_pressure(0d0, alf, 0d0, pi_infs(1), gammas(1), rho, 0d0, pres)
-
+        gam_b = 1d0 + 1d0/fluid_pp(num_fluids + 1)%gamma
+        
         ! Loop
         ii = 1
         do while (.true.)
 
-            f0 = (Ca + 2d0/Web)*(1d0/radius)**(3d0*gam_sm) - 2d0/(Web*radius) + 1d0 - Ca - pres
-            ! f1 = -3d0*gam_sm*(Ca + 2d0/Web)*(1d0/radius)**(3d0*gam_sm+1d0) + 2d0/(Web*radius**2d0) - (pres + pi_inf)/(1d0 - alf)*3d0*alf/radius
-            f1 = -3d0*gam_sm*(Ca + 2d0/Web)*(1d0/radius)**(3d0*gam_sm+1d0) + 2d0/(Web*radius**2d0)
+            f0 = (Ca + 2d0/Web)*(1d0/radius)**(3d0*gam_b) - 2d0/(Web*radius) + 1d0 - Ca - pres
+            g0 = (pres + pi_inf)/(gam - 1d0) - rho*cvt/(1d0 - alf)
 
-            if (abs(f0) .le. 1e-9) then
+            fr = -3d0*gam_b*(Ca + 2d0/Web)*(1d0/radius)**(3d0*gam_b+1d0) + 2d0/(Web*radius**2d0)
+            gr = -rho*cvt/(1d0-alf)**2 * (3d0*alf/radius)
+
+            fp = -1d0
+            gp = 1d0/(gam - 1d0)
+
+            if (abs(f0) .le. 1e-10 .and. abs(g0) .le. 1e-10) then
                 exit
             end if
 
-            if (abs(f1) < 1e-12) then
-                stop "f1 < 1e-12 at s_compute_equilibrium_state"
+            if (abs(fr) < 1e-12) then
+                stop "fr < 1e-12 at s_compute_equilibrium_state"
+            elseif (f0 /= f0 .or. fr /= fr .or. g0 /= g0 .or. gr /= gr) then
+                print *, ii, radius, alf, pres, f0, fr, g0, gr
+                stop "f0, fr, g0 and/or gr is NaN"
             elseif (ii > 1000) then
+                print *, ii, radius, alf, pres, f0, fr, g0, gr
                 stop "ii > 1000 at s_compute_equilibrium_state"
             end if
 
             ! Update variables
-            ! alf = alf / radius**3
-            radius = radius - f0/f1
-            ! alf = alf * radius**3
-            ! call s_compute_pressure(0d0, alf, 0d0, pi_infs(1), gammas(1), rho, 0d0, pres)
+            radius = radius + (-f0 * gp + fp * g0) / (fr*gp - fp*gr)
+            pres = pres + (-fr * g0 + f0 * gr) / (fr*gp - fp*gr)
+
+            ! radius = radius - f0/f1
+            if (radius < 0d0) then
+                print *, ii, rho, radius, alf, pres, f0, fr, g0, gr
+                print *, (Ca + 2d0/Web)*(1d0/radius)**(3d0*gam_b) - 2d0/(Web*radius) + 1d0 - Ca
+                print *, (gam - 1d0)*rho*cvt/(1d0 - alf) - pi_inf
+                stop "radius < 0"
+            end if
+
+            alf = nbub*(4d0*pi/3d0)*radius**3d0
+
+            write(99,*) ii, pres, alf, (pres + pi_inf)/(gam - 1d0) - rho*cvt/(1d0 - alf)
 
             ii = ii + 1
         end do
-
-        alf = nbub * (4d0*pi/3d0) * radius**3d0
 
     end subroutine s_compute_equilibrium_state
 
@@ -586,8 +611,8 @@ contains
             adv = 0d0
             nbub_mean = 0d0
         end if 
-        gam = 1d0 + 1d0/fluid_pp(1)%gamma
-        pi_inf = fluid_pp(1)%pi_inf*(gam - 1d0)/gam * uratio**2
+        gam = 1d0 + 1d0/gammas(1)
+        pi_inf = pi_infs(1)*(gam - 1d0)/gam * uratio**2
         rho = patch_icpp(1)%alpha_rho(1)
         p_mean = patch_icpp(1)%pres*uratio**2
         c1 = sqrt((gam*(p_mean + pi_inf))/(rho*(1d0 - adv)))
@@ -664,8 +689,8 @@ contains
             ii = 4; jj = 4; br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = alpha*u_mean(j); 
 
             ! if (no_energy_eq) then
-            !     ii = 2; jj = 1; br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = alpha*(gam-1d0)*cvt/rho_mean(j); 
-            !     ii = 4; jj = 1; br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = beta*(gam-1d0)*cvt/rho_mean(j); 
+            !     ii = 2; jj = 1; br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = alpha*(gam - 1d0)*cvt/rho_mean(j); 
+            !     ii = 4; jj = 1; br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = beta*(gam - 1d0)*cvt/rho_mean(j); 
             ! else
                 ii = 2; jj = 5; br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = alpha/rho_mean(j); 
                 ii = 4; jj = 5; br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = beta/rho_mean(j); 
@@ -678,7 +703,7 @@ contains
                 ii = 1; jj = 3; ci((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + k) = -rho_mean(j)*d(j, k); 
 
                 ! if (no_energy_eq) then
-                    ! ii = 3; jj = 1; ci((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = -(gam-1d0)*cvt*d(j, k)/rho_mean(j); 
+                !     ii = 3; jj = 1; ci((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = -(gam - 1d0)*cvt*d(j, k)/rho_mean(j); 
                 ! else
                     ii = 3; jj = 5; ci((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + k) = -d(j, k)/rho_mean(j); 
                     ii = 5; jj = 3; ci((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + k) = -gam*(p_mean + pi_inf)*d(j, k); 
@@ -739,23 +764,25 @@ contains
         end do
 
         ! Condition 4: dp/dy +- rho c dv/dy = 0 at BC
-        do j = 0, nvar*(n + 2) - 1
-            ! beg
-            ii = 4*(n + 2)
-            ar(j, ii + 1) = ar(j, ii + 1) + ar(j, ii)
-            ai(j, ii + 1) = ai(j, ii + 1) + ai(j, ii)
-            jj = 2*(n + 2)
-            ar(j, jj + 1) = ar(j, jj + 1) + ar(j, ii) * rho_mean(j) / mach  
-            ai(j, jj + 1) = ai(j, jj + 1) + ai(j, ii) * rho_mean(j) / mach  
+        ! if (.not. no_energy_eq) then
+            do j = 0, nvar*(n + 2) - 1
+                ! beg
+                ii = 4*(n + 2)
+                ar(j, ii + 1) = ar(j, ii + 1) + ar(j, ii)
+                ai(j, ii + 1) = ai(j, ii + 1) + ai(j, ii)
+                jj = 2*(n + 2)
+                ar(j, jj + 1) = ar(j, jj + 1) + ar(j, ii) * rho_mean(j) / mach  
+                ai(j, jj + 1) = ai(j, jj + 1) + ai(j, ii) * rho_mean(j) / mach  
 
-            ! end
-            ii = 5*(n + 2) - 1
-            ar(j, ii - 1) = ar(j, ii - 1) + ar(j, ii)
-            ai(j, ii - 1) = ai(j, ii - 1) + ai(j, ii)
-            jj = 3*(n + 2) - 1
-            ar(j, jj - 1) = ar(j, jj - 1) - ar(j, ii) * rho_mean(j) / mach  
-            ai(j, jj - 1) = ai(j, jj - 1) - ai(j, ii) * rho_mean(j) / mach  
-        end do
+                ! end
+                ii = 5*(n + 2) - 1
+                ar(j, ii - 1) = ar(j, ii - 1) + ar(j, ii)
+                ai(j, ii - 1) = ai(j, ii - 1) + ai(j, ii)
+                jj = 3*(n + 2) - 1
+                ar(j, jj - 1) = ar(j, jj - 1) - ar(j, ii) * rho_mean(j) / mach  
+                ai(j, jj - 1) = ai(j, jj - 1) - ai(j, ii) * rho_mean(j) / mach  
+            end do
+        ! end if
 
         ! Condition 5: c^2 drho/dy +- dp/dy = 0 at BC
         do j = 0, nvar*(n + 2) - 1
@@ -928,10 +955,12 @@ contains
         xbi(3*(n + 2) + n + 1) = xbi(3*(n + 2) + n)
 
         ! p at BC
-        xbr(4*(n + 2) + 0) = xbr(4*(n + 2) + 1) + xbr(2*(n + 2) + 1) * rho_mean(1) / mach  
-        xbi(4*(n + 2) + 0) = xbi(4*(n + 2) + 1) + xbi(2*(n + 2) + 1) * rho_mean(1) / mach  
-        xbr(4*(n + 2) + n + 1) = xbr(4*(n + 2) + n) - xbr(2*(n + 2) + n) * rho_mean(n) / mach  
-        xbi(4*(n + 2) + n + 1) = xbi(4*(n + 2) + n) - xbi(2*(n + 2) + n) * rho_mean(n) / mach  
+        ! if (.not. no_energy_eq) then
+            xbr(4*(n + 2) + 0) = xbr(4*(n + 2) + 1) + xbr(2*(n + 2) + 1) * rho_mean(1) / mach  
+            xbi(4*(n + 2) + 0) = xbi(4*(n + 2) + 1) + xbi(2*(n + 2) + 1) * rho_mean(1) / mach  
+            xbr(4*(n + 2) + n + 1) = xbr(4*(n + 2) + n) - xbr(2*(n + 2) + n) * rho_mean(n) / mach  
+            xbi(4*(n + 2) + n + 1) = xbi(4*(n + 2) + n) - xbi(2*(n + 2) + n) * rho_mean(n) / mach  
+        ! end if
 
         xcr = 0d0
         xci = 0d0
@@ -957,7 +986,9 @@ contains
                     wave(2, i, j, k) = xcr(  (n + 1) + j)*cos(ang) - xci(  (n + 1) + j)*sin(ang) ! u
                     wave(3, i, j, k) = xcr(2*(n + 1) + j)*cos(ang) - xci(2*(n + 1) + j)*sin(ang) ! v
                     wave(4, i, j, k) = xcr(3*(n + 1) + j)*cos(ang) - xci(3*(n + 1) + j)*sin(ang) ! w
-                    wave(5, i, j, k) = xcr(4*(n + 1) + j)*cos(ang) - xci(4*(n + 1) + j)*sin(ang) ! p
+                    ! if (.not. no_energy_eq) then
+                        wave(5, i, j, k) = xcr(4*(n + 1) + j)*cos(ang) - xci(4*(n + 1) + j)*sin(ang) ! p
+                    ! end if
                 end do
             end do
         end do
