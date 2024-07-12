@@ -156,7 +156,7 @@ contains
             relax, relax_model, &
             palpha_eps, ptgalpha_eps, &
             R0_type, file_per_process, sigma, &
-            pi_fac, adv_n, adap_dt, &
+            pi_fac, adv_n, adap_dt, coupling, &
             no_energy_eq, cvt, cvt_fac, artificial_Ma, apc, &
             bf_x, bf_y, bf_z, &
             k_x, k_y, k_z, w_x, w_y, w_z, p_x, p_y, p_z, &
@@ -1290,7 +1290,7 @@ contains
         ! Reading in the user provided initial condition and grid data
         call s_read_data_files(q_cons_ts(1)%vf)
 
-        call s_initialize_cvt(q_cons_ts(1)%vf)
+        if (no_energy_eq) call s_initialize_cvt(q_cons_ts(1)%vf)
 
         if (model_eqns == 3) call s_initialize_internal_energy_equations(q_cons_ts(1)%vf)
         if (ib) call s_ibm_setup()

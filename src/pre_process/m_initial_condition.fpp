@@ -493,7 +493,7 @@ contains
                         if (no_energy_eq) then 
                             ! write(99,*) q_prim_vf(cont_idx%beg)%sf(i, j, k), q_prim_vf(E_idx)%sf(i, j, k), q_prim_vf(alf_idx)%sf(i, j, k), (q_prim_vf(E_idx)%sf(i, j, k) + pi_inf)/(gam - 1d0) - q_prim_vf(cont_idx%beg)%sf(i, j, k)*cvt/(1d0 - q_prim_vf(alf_idx)%sf(i, j, k))
                             ! print *, i, j, k, q_prim_vf(cont_idx%beg)%sf(i, j, k), q_prim_vf(E_idx)%sf(i, j, k), q_prim_vf(n_idx)%sf(i, j, k),q_prim_vf(alf_idx)%sf(i, j, k), q_prim_vf(bub_idx%rs(1))%sf(i, j, k)
-                            call s_compute_equilibrium_state(q_prim_vf(cont_idx%beg)%sf(i, j, k), &
+                            call s_compute_equilibrium_state2(q_prim_vf(cont_idx%beg)%sf(i, j, k), &
                                                             q_prim_vf(E_idx)%sf(i, j, k), &
                                                             q_prim_vf(n_idx)%sf(i, j, k), &
                                                             q_prim_vf(alf_idx)%sf(i, j, k), &
@@ -507,7 +507,11 @@ contains
                             !     print *, gam, pi_inf, cvt, q_prim_vf(cont_idx%beg)%sf(i, j, k), q_prim_vf(E_idx)%sf(i, j, k)
                             ! end if
                         else 
-                            q_prim_vf(alf_idx)%sf(i, j, k) = q_prim_vf(n_idx)%sf(i, j, k)*(4d0*pi/3d0)*q_prim_vf(bub_idx%rs(1))%sf(i, j, k)**3d0
+                            call s_compute_equilibrium_state(q_prim_vf(cont_idx%beg)%sf(i, j, k), &
+                                                             q_prim_vf(E_idx)%sf(i, j, k), &
+                                                             q_prim_vf(n_idx)%sf(i, j, k), &
+                                                             q_prim_vf(alf_idx)%sf(i, j, k), &
+                                                             q_prim_vf(bub_idx%rs(1))%sf(i, j, k))
                         end if
                     end if
 
@@ -517,7 +521,7 @@ contains
 
     end subroutine s_superposition_instability_wave ! ----------------------
 
-    subroutine s_compute_equilibrium_state(rho, pres, nbub, alf, radius)
+    subroutine s_compute_equilibrium_state2(rho, pres, nbub, alf, radius)
         real(kind(0d0)), intent(in) :: rho
         ! real(kind(0d0)), intent(inout) :: alf
         ! real(kind(0d0)), intent(out) :: pres
@@ -579,6 +583,55 @@ contains
 
             ii = ii + 1
         end do
+
+    end subroutine s_compute_equilibrium_state2
+
+    subroutine s_compute_equilibrium_state(rho, pres, nbub, alf, radius)
+        real(kind(0d0)), intent(in) :: rho, pres, nbub
+        real(kind(0d0)), intent(inout) :: radius, alf
+        real(kind(0d0)) :: f0, f1
+        real(kind(0d0)) :: gam, pi_inf
+        real(kind(0d0)) :: gam_b
+        integer :: ii, jj
+
+        gam = 1d0 + 1d0/gammas(1)
+        pi_inf = pi_infs(1)/gam*(gam - 1d0)
+        gam_b = 1d0 + 1d0/fluid_pp(num_fluids + 1)%gamma
+        
+        ! Loop
+        ii = 1
+        do while (.true.)
+
+            f0 = (Ca + 2d0/Web)*(1d0/radius)**(3d0*gam_b) - 2d0/(Web*radius) + 1d0 - Ca - pres
+            f1 = -3d0*gam_b*(Ca + 2d0/Web)*(1d0/radius)**(3d0*gam_b+1d0) + 2d0/(Web*radius**2d0)
+
+            if (abs(f0) .le. 1e-10) then
+                exit
+            end if
+
+            if (abs(f1) < 1e-12) then
+                stop "f1 < 1e-12 at s_compute_equilibrium_state"
+            elseif (f0 /= f0 .or. f1 /= f1) then
+                print *, ii, radius, alf, pres, f0, f1
+                stop "f0, fr, g0 and/or gr is NaN"
+            elseif (ii > 1000) then
+                print *, ii, radius, alf, pres, f0, f1
+                stop "ii > 1000 at s_compute_equilibrium_state"
+            end if
+
+            ! Update variables
+            radius = radius - f0/f1
+
+            ! radius = radius - f0/f1
+            if (radius < 0d0) then
+                print *, ii, rho, radius, alf, pres, f0, f1
+                stop "radius < 0"
+            end if
+
+            ii = ii + 1
+        end do
+
+        if (coupling) alf = nbub*(4d0*pi/3d0)*radius**3d0
 
     end subroutine s_compute_equilibrium_state
 
@@ -692,11 +745,11 @@ contains
             !     ii = 2; jj = 1; br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = alpha*(gam - 1d0)*cvt/rho_mean(j); 
             !     ii = 4; jj = 1; br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = beta*(gam - 1d0)*cvt/rho_mean(j); 
             ! else
-                ii = 2; jj = 5; br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = alpha/rho_mean(j); 
-                ii = 4; jj = 5; br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = beta/rho_mean(j); 
-                ii = 5; jj = 2; br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = gam*(p_mean + pi_inf)*alpha; 
-                ii = 5; jj = 4; br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = gam*(p_mean + pi_inf)*beta; 
-                ii = 5; jj = 5; br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = alpha*u_mean(j); 
+            ii = 2; jj = 5; br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = alpha/rho_mean(j); 
+            ii = 4; jj = 5; br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = beta/rho_mean(j); 
+            ii = 5; jj = 2; br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = gam*(p_mean + pi_inf)*alpha; 
+            ii = 5; jj = 4; br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = gam*(p_mean + pi_inf)*beta; 
+            ii = 5; jj = 5; br((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = alpha*u_mean(j); 
             ! end if
 
             do k = 0, n + 1
@@ -705,8 +758,8 @@ contains
                 ! if (no_energy_eq) then
                 !     ii = 3; jj = 1; ci((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + j) = -(gam - 1d0)*cvt*d(j, k)/rho_mean(j); 
                 ! else
-                    ii = 3; jj = 5; ci((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + k) = -d(j, k)/rho_mean(j); 
-                    ii = 5; jj = 3; ci((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + k) = -gam*(p_mean + pi_inf)*d(j, k); 
+                ii = 3; jj = 5; ci((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + k) = -d(j, k)/rho_mean(j); 
+                ii = 5; jj = 3; ci((ii - 1)*(n + 2) + j, (jj - 1)*(n + 2) + k) = -gam*(p_mean + pi_inf)*d(j, k); 
                 ! end if
             end do
         end do
@@ -765,23 +818,23 @@ contains
 
         ! Condition 4: dp/dy +- rho c dv/dy = 0 at BC
         ! if (.not. no_energy_eq) then
-            do j = 0, nvar*(n + 2) - 1
-                ! beg
-                ii = 4*(n + 2)
-                ar(j, ii + 1) = ar(j, ii + 1) + ar(j, ii)
-                ai(j, ii + 1) = ai(j, ii + 1) + ai(j, ii)
-                jj = 2*(n + 2)
-                ar(j, jj + 1) = ar(j, jj + 1) + ar(j, ii) * rho_mean(j) / mach  
-                ai(j, jj + 1) = ai(j, jj + 1) + ai(j, ii) * rho_mean(j) / mach  
+        do j = 0, nvar*(n + 2) - 1
+            ! beg
+            ii = 4*(n + 2)
+            ar(j, ii + 1) = ar(j, ii + 1) + ar(j, ii)
+            ai(j, ii + 1) = ai(j, ii + 1) + ai(j, ii)
+            jj = 2*(n + 2)
+            ar(j, jj + 1) = ar(j, jj + 1) + ar(j, ii) * rho_mean(j) / mach  
+            ai(j, jj + 1) = ai(j, jj + 1) + ai(j, ii) * rho_mean(j) / mach  
 
-                ! end
-                ii = 5*(n + 2) - 1
-                ar(j, ii - 1) = ar(j, ii - 1) + ar(j, ii)
-                ai(j, ii - 1) = ai(j, ii - 1) + ai(j, ii)
-                jj = 3*(n + 2) - 1
-                ar(j, jj - 1) = ar(j, jj - 1) - ar(j, ii) * rho_mean(j) / mach  
-                ai(j, jj - 1) = ai(j, jj - 1) - ai(j, ii) * rho_mean(j) / mach  
-            end do
+            ! end
+            ii = 5*(n + 2) - 1
+            ar(j, ii - 1) = ar(j, ii - 1) + ar(j, ii)
+            ai(j, ii - 1) = ai(j, ii - 1) + ai(j, ii)
+            jj = 3*(n + 2) - 1
+            ar(j, jj - 1) = ar(j, jj - 1) - ar(j, ii) * rho_mean(j) / mach  
+            ai(j, jj - 1) = ai(j, jj - 1) - ai(j, ii) * rho_mean(j) / mach  
+        end do
         ! end if
 
         ! Condition 5: c^2 drho/dy +- dp/dy = 0 at BC
@@ -956,10 +1009,10 @@ contains
 
         ! p at BC
         ! if (.not. no_energy_eq) then
-            xbr(4*(n + 2) + 0) = xbr(4*(n + 2) + 1) + xbr(2*(n + 2) + 1) * rho_mean(1) / mach  
-            xbi(4*(n + 2) + 0) = xbi(4*(n + 2) + 1) + xbi(2*(n + 2) + 1) * rho_mean(1) / mach  
-            xbr(4*(n + 2) + n + 1) = xbr(4*(n + 2) + n) - xbr(2*(n + 2) + n) * rho_mean(n) / mach  
-            xbi(4*(n + 2) + n + 1) = xbi(4*(n + 2) + n) - xbi(2*(n + 2) + n) * rho_mean(n) / mach  
+        xbr(4*(n + 2) + 0) = xbr(4*(n + 2) + 1) + xbr(2*(n + 2) + 1) * rho_mean(1) / mach  
+        xbi(4*(n + 2) + 0) = xbi(4*(n + 2) + 1) + xbi(2*(n + 2) + 1) * rho_mean(1) / mach  
+        xbr(4*(n + 2) + n + 1) = xbr(4*(n + 2) + n) - xbr(2*(n + 2) + n) * rho_mean(n) / mach  
+        xbi(4*(n + 2) + n + 1) = xbi(4*(n + 2) + n) - xbi(2*(n + 2) + n) * rho_mean(n) / mach  
         ! end if
 
         xcr = 0d0
@@ -987,7 +1040,7 @@ contains
                     wave(3, i, j, k) = xcr(2*(n + 1) + j)*cos(ang) - xci(2*(n + 1) + j)*sin(ang) ! v
                     wave(4, i, j, k) = xcr(3*(n + 1) + j)*cos(ang) - xci(3*(n + 1) + j)*sin(ang) ! w
                     ! if (.not. no_energy_eq) then
-                        wave(5, i, j, k) = xcr(4*(n + 1) + j)*cos(ang) - xci(4*(n + 1) + j)*sin(ang) ! p
+                    wave(5, i, j, k) = xcr(4*(n + 1) + j)*cos(ang) - xci(4*(n + 1) + j)*sin(ang) ! p
                     ! end if
                 end do
             end do

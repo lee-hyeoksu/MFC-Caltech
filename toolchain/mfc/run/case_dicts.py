@@ -70,6 +70,7 @@ PRE_PROCESS.update({
     'ptgalpha_eps': ParamType.REAL,
     'ib': ParamType.LOG,
     'num_ibs': ParamType.INT,
+    'coupling': ParamType.LOG,
 })
 
 for ib_id in range(1, 10+1):
@@ -194,6 +195,7 @@ SIMULATION.update({
     'apc': ParamType.LOG,
     'ib': ParamType.LOG,
     'num_ibs': ParamType.INT,
+    'coupling': ParamType.LOG,
 })
 
 # NOTE: Not currently present

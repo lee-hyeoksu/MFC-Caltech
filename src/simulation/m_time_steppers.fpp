@@ -401,7 +401,7 @@ contains
 
         if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
 
-        if (adv_n) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
+        if (adv_n .and. coupling) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
 
         if (ib) then
             if (qbmm .and. .not. polytropic) then
@@ -512,7 +512,7 @@ contains
             call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
         end if
 
-        if (adv_n) call s_comp_alpha_from_n(q_cons_ts(2)%vf)
+        if (adv_n .and. coupling) call s_comp_alpha_from_n(q_cons_ts(2)%vf)
 
         if (ib) then
             if (qbmm .and. .not. polytropic) then
@@ -587,7 +587,7 @@ contains
             call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
         end if
 
-        if (adv_n) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
+        if (adv_n .and. coupling) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
 
         if (ib) then
             if (qbmm .and. .not. polytropic) then
@@ -657,7 +657,6 @@ contains
                             print *, (q_cons_ts(2)%vf(q)%sf(j, k, l), q=1,sys_size)
                             print *, (q_cons_ts(1)%vf(q)%sf(j, k, l), q=1,sys_size)
                             print *, (rhs_vf(q)%sf(j, k, l), q=1,sys_size)
-                            print *, cvt_arti(j, k, l)
                             stop
                         end if 
                     end do
@@ -710,7 +709,7 @@ contains
             call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
         end if
 
-        if (adv_n) call s_comp_alpha_from_n(q_cons_ts(2)%vf)
+        if (adv_n .and. coupling) call s_comp_alpha_from_n(q_cons_ts(2)%vf)
 
         if (ib) then
             if (qbmm .and. .not. polytropic) then
@@ -791,7 +790,7 @@ contains
             call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
         end if
 
-        if (adv_n) call s_comp_alpha_from_n(q_cons_ts(2)%vf)
+        if (adv_n .and. coupling) call s_comp_alpha_from_n(q_cons_ts(2)%vf)
 
         if (ib) then
             if (qbmm .and. .not. polytropic) then
@@ -871,7 +870,7 @@ contains
             call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
         end if
 
-        if (adv_n) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
+        if (adv_n .and. coupling) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
 
         if (ib) then
             if (qbmm .and. .not. polytropic) then
@@ -907,20 +906,14 @@ contains
 
         call nvtxStartRange("Time_Step")
 
-        j = 17; k = 124; l = 0
-        print *, "0", (q_cons_ts(1)%vf(i)%sf(j, k, l), i=1,sys_size), cvt_arti(j, k, l)
-
         ! Stage 1 of 3 =====================================================
         call s_adaptive_dt_bubble(t_step)
-        print *, "1", (q_cons_ts(1)%vf(i)%sf(j, k, l), i=1,sys_size), cvt_arti(j, k, l)
 
         ! Stage 2 of 3 =====================================================
         call s_3rd_order_tvd_rk(t_step, time_avg)
-        print *, "2", (q_cons_ts(1)%vf(i)%sf(j, k, l), i=1,sys_size), cvt_arti(j, k, l)
 
         ! Stage 3 of 3 =====================================================
         call s_adaptive_dt_bubble(t_step)
-        print *, "3", (q_cons_ts(1)%vf(i)%sf(j, k, l), i=1,sys_size), cvt_arti(j, k, l)
 
         call nvtxEndRange
 
@@ -953,7 +946,7 @@ contains
 
         call s_compute_bubble_source(q_cons_ts(1)%vf, q_prim_vf, t_step, rhs_vf)
 
-        call s_comp_alpha_from_n(q_cons_ts(1)%vf)
+        if (coupling) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
 
         ! if (no_energy_eq) call s_update_cvt(q_cons_ts(1)%vf)
 

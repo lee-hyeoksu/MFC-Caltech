@@ -315,6 +315,9 @@ contains
 
                         myRho = q_prim_vf(1)%sf(j, k, l)
                         myP = q_prim_vf(E_idx)%sf(j, k, l)
+                        ! myE = q_cons_vf(E_idx)%sf(j, k, l)
+
+                        ! dyn_pres = 0d0
 
                         if (.not. polytropic) then
                             pb = q_prim_vf(ps(q))%sf(j, k, l)
@@ -381,9 +384,10 @@ contains
                                         myR = myR_tmp1(4)
                                         myV = myV_tmp1(4)
                                         
-                                        alf = nbub*(4d0*pi/3d0)*myR**3
+                                        ! alf = nbub*(4d0*pi/3d0)*myR**3
 
-                                        myP = myRho/(1d0 - alf)*(cvt/cvt_fac)/gammas(1) - pi_infs(1)/pi_fac/(gammas(1)+1d0)
+                                        ! call s_compute_pressure(myE)
+                                        ! myP = myRho/(1d0 - alf)*(cvt/cvt_fac)/gammas(1) - pi_infs(1)/pi_fac/(gammas(1)+1d0)
 
                                         ! Update step size for the next sub-step
                                         h = h*min(2d0, max(0.5d0, (1d-4/err1)**(1d0/3d0)))
@@ -399,8 +403,13 @@ contains
                                         
                                         iter2 = iter2 + 1
                                     end if
+
+                                    if (myR /= myR .or. myV /= myV) then
+                                        print *, "myR and/or myV is NaN", j, k, l, myR, myV
+                                        stop "myR and/or myV is NaN"
+                                    end if
                                     if (iter2 > 100) then
-                                        print *, j, k, l
+                                        print *, "iter2 > 100", j, k, l
                                         stop "iter2 > 100"
                                     end if 
                                 end do
@@ -411,7 +420,7 @@ contains
                                 iter1 = iter1 + 1
 
                                 if (iter1 > 100) then
-                                    print *, j, k, l
+                                    print *, "iter1 > 100", j, k, l
                                     stop "iter1 > 100"
                                 end if 
 
