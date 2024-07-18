@@ -789,6 +789,21 @@ contains
         call s_populate_primitive_variables_buffers(q_prim_qp%vf, pb, mv)
         call nvtxEndRange
 
+        do i = 1, sys_size
+            do l = iz%beg, iz%end
+                do k = iy%beg, iy%end
+                    do j = ix%beg, ix%end
+                        if (q_prim_qp%vf(i)%sf(j, k, l) /= q_prim_qp%vf(i)%sf(j, k, l)) then
+                            print *, i, j, k, l
+                            print *, (q_cons_qp%vf(q)%sf(j, k, l), q=1,sys_size)
+                            print *, (q_prim_qp%vf(q)%sf(j, k, l), q=1,sys_size)
+                            stop "NaN in conversion"
+                        end if
+                    end do
+                end do
+            end do
+        end do
+
         if (t_step == t_step_stop) return
         ! ==================================================================
 

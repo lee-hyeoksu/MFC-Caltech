@@ -140,8 +140,10 @@ contains
 
         if ((model_eqns /= 4) .and. (bubbles .neqv. .true.)) then
             pres = (energy - dyn_p - pi_inf - qv)/gamma
-        else if ((model_eqns /= 4) .and. bubbles) then
+        else if ((model_eqns /= 4) .and. bubbles .and. (no_energy_eq .eqv. .false.)) then
             pres = ((energy - dyn_p)/(1.d0 - alf) - pi_inf - qv)/gamma
+        else if ((model_eqns /= 4) .and. bubbles .and. no_energy_eq) then
+            pres = (cvt * rho / (1d0 - alf) - gamma * pi_inf / (gamma + 1d0)) / gamma
         else
             pres = (pref + pi_inf)* &
                    (energy/ &
@@ -943,6 +945,17 @@ contains
                                             qK_cons_vf(alf_idx)%sf(j, k, l), &
                                             dyn_pres_K, pi_inf_K, gamma_K, rho_K, qv_K, pres)
 
+#ifdef MFC_SIMULATION
+                    if (no_energy_eq) then
+                        pres = (cvt_arti(j, k, l) * rho_K / (1d0 - qK_cons_vf(alf_idx)%sf(j, k, l)) - gamma_K * pi_inf_K / (gamma_K + 1d0)) / gamma_K
+                        ! if (j == 238 .and. k == 116) print *, "Conversion", cvt_arti(j, k, l), rho_K, qK_cons_vf(alf_idx)%sf(j, k, l), gamma_K, pi_inf_K, pres
+                    end if
+#endif
+#ifdef MFC_POST_PROCESS
+                    if (no_energy_eq) then
+                        pres = qK_cons_vf(E_idx)%sf(j, k, l)
+                    end if
+#endif
                     qK_prim_vf(E_idx)%sf(j, k, l) = pres
 
                     if (bubbles) then
@@ -1090,11 +1103,13 @@ contains
                         q_cons_vf(E_idx)%sf(j, k, l) = &
                             gamma*q_prim_vf(E_idx)%sf(j, k, l) + dyn_pres + pi_inf &
                             + qv
-                    else if ((model_eqns /= 4) .and. (bubbles)) then
+                    else if ((model_eqns /= 4) .and. (bubbles) .and. (no_energy_eq .eqv. .false.)) then
                         ! \tilde{E} = dyn_pres + (1-\alf)(\Gamma p_l + \Pi_inf)
                         q_cons_vf(E_idx)%sf(j, k, l) = dyn_pres + &
                                                        (1.d0 - q_prim_vf(alf_idx)%sf(j, k, l))* &
                                                        (gamma*q_prim_vf(E_idx)%sf(j, k, l) + pi_inf)
+                    else if ((model_eqns /= 4) .and. (bubbles) .and. (no_energy_eq .eqv. .true.)) then
+                        q_cons_vf(E_idx)%sf(j, k, l) = q_prim_vf(E_idx)%sf(j, k, l)
                     else
                         !Tait EOS, no conserved energy variable
                         q_cons_vf(E_idx)%sf(j, k, l) = 0.

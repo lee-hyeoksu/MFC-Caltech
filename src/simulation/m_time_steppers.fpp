@@ -272,6 +272,22 @@ contains
                 iz_t%beg:iz_t%beg + 1, 1:nnode, 1:nb))
         end if
 
+        if (adv_n) then
+            @:ALLOCATE(q_prim_vf(n_idx)%sf(ix_t%beg:ix_t%end, &
+                iy_t%beg:iy_t%end, &
+                iz_t%beg:iz_t%end))
+            @:ACC_SETUP_SFs(q_prim_vf(n_idx))
+        end if
+
+        if (no_energy_eq) then
+            @:ALLOCATE(cvt_true(ix_t%beg:ix_t%end, &
+                                iy_t%beg:iy_t%end, &
+                                iz_t%beg:iz_t%end))
+            @:ALLOCATE(cvt_arti(ix_t%beg:ix_t%end, &
+                                iy_t%beg:iy_t%end, &
+                                iz_t%beg:iz_t%end))
+        end if
+
         ! Allocating the cell-average RHS variables
         @:ALLOCATE_GLOBAL(rhs_vf(1:sys_size))
 
@@ -377,7 +393,7 @@ contains
 
         if (model_eqns == 3) call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
 
-        if (adv_n) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
+        if (adv_n .and. coupling) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
 
         if (ib) then
             if (qbmm .and. .not. polytropic) then
@@ -480,7 +496,7 @@ contains
             call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
         end if
 
-        if (adv_n) call s_comp_alpha_from_n(q_cons_ts(2)%vf)
+        if (adv_n .and. coupling) call s_comp_alpha_from_n(q_cons_ts(2)%vf)
 
         if (ib) then
             if (qbmm .and. .not. polytropic) then
@@ -555,7 +571,7 @@ contains
             call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
         end if
 
-        if (adv_n) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
+        if (adv_n .and. coupling) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
 
         if (ib) then
             if (qbmm .and. .not. polytropic) then
@@ -661,7 +677,7 @@ contains
             call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
         end if
 
-        if (adv_n) call s_comp_alpha_from_n(q_cons_ts(2)%vf)
+        if (adv_n .and. coupling) call s_comp_alpha_from_n(q_cons_ts(2)%vf)
 
         if (ib) then
             if (qbmm .and. .not. polytropic) then
@@ -737,7 +753,7 @@ contains
             call s_pressure_relaxation_procedure(q_cons_ts(2)%vf)
         end if
 
-        if (adv_n) call s_comp_alpha_from_n(q_cons_ts(2)%vf)
+        if (adv_n .and. coupling) call s_comp_alpha_from_n(q_cons_ts(2)%vf)
 
         if (ib) then
             if (qbmm .and. .not. polytropic) then
@@ -812,7 +828,7 @@ contains
             call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
         end if
 
-        if (adv_n) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
+        if (adv_n .and. coupling) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
 
         if (ib) then
             if (qbmm .and. .not. polytropic) then
@@ -879,7 +895,7 @@ contains
         integer :: i, j, k, l, q !< Generic loop iterator
 
         ix%beg = 0; iy%beg = 0; iz%beg = 0
-        ix%end = m; iy%end = n; iz%end = p
+        ix%end = m; iy%end = n; iz%end = p        
         call s_convert_conservative_to_primitive_variables( &
             q_cons_ts(1)%vf, &
             q_prim_vf, &
@@ -888,9 +904,67 @@ contains
 
         call s_compute_bubble_source(q_cons_ts(1)%vf, q_prim_vf, t_step, rhs_vf)
 
-        call s_comp_alpha_from_n(q_cons_ts(1)%vf)
+        if (coupling) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
+
+        ! if (no_energy_eq) call s_update_cvt(q_cons_ts(1)%vf)
 
     end subroutine s_adaptive_dt_bubble ! ------------------------------
+
+
+    subroutine s_initialize_cvt(q_cons_vf)
+        type(scalar_field), dimension(1:sys_size), intent(IN) :: q_cons_vf
+        real(kind(0d0)) :: Gamma, Pi_inf_true, Pi_inf_arti
+        real(kind(0d0)) :: alf, rho, pres
+
+        integer :: i, j, k, l
+
+        Gamma = gammas(1)
+        Pi_inf_true = pi_infs(1)/pi_fac    ! True pi_inf
+        Pi_inf_arti = pi_infs(1)    ! Artificial pi_inf
+
+        !$acc parallel loop collapse(3) gang vector default(present)
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    rho = q_cons_vf(cont_idx%beg)%sf(j, k, l)
+                    alf = q_cons_vf(alf_idx)%sf(j, k, l)
+                    pres = q_cons_vf(E_idx)%sf(j, k, l)
+                    cvt_true(j, k, l) = (1d0 - alf)/rho * (Gamma * pres + Gamma*Pi_inf_true/(Gamma + 1d0))
+                    cvt_arti(j, k, l) = (1d0 - alf)/rho * (Gamma * pres + Gamma*Pi_inf_arti/(Gamma + 1d0))
+                end do
+            end do
+        end do
+
+    end subroutine s_initialize_cvt
+
+
+    subroutine s_update_cvt(q_cons_vf)
+
+        type(scalar_field), dimension(1:sys_size), intent(IN) :: q_cons_vf
+
+        real(kind(0d0)) :: Gamma, Pi_inf_true, Pi_inf_arti
+        real(kind(0d0)) :: alf, rho
+
+        integer :: i, j, k, l
+
+        Gamma = gammas(1)
+        Pi_inf_true = pi_infs(1)/pi_fac    ! True pi_inf
+        Pi_inf_arti = pi_infs(1)    ! Artificial pi_inf
+
+        !$acc parallel loop collapse(3) gang vector default(present)
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    rho = q_cons_vf(cont_idx%beg)%sf(j, k, l)
+                    alf = q_cons_vf(alf_idx)%sf(j, k, l)
+                    cvt_arti(j, k, l) = cvt_true(j, k, l) - (1d0 - alf)/rho * (Gamma/(Gamma + 1d0)) * (Pi_inf_true - Pi_inf_arti)
+                    ! if ( j == 238 .and. k == 116 ) print *, "s_update_cvt", cvt_true(j, k, l), alf, rho, Gamma, Pi_inf_true, Pi_inf_arti
+                end do
+            end do
+        end do
+
+    end subroutine s_update_cvt
+
 
     !> This subroutine applies the body forces source term at each
         !! Runge-Kutta stage
@@ -917,7 +991,6 @@ contains
                 end do
             end do
         end do
-
     end subroutine s_apply_bodyforces
 
     !> This subroutine saves the temporary q_prim_vf vector

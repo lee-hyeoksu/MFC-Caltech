@@ -108,7 +108,10 @@ module m_global_parameters
     logical :: vel_profile !< Set hyperbolic tangent streamwise velocity profile
     logical :: instability_wave !< Superimpose instability waves to surrounding fluid flow
 
+    logical :: no_energy_eq
+    real(kind(0d0)) :: cvt, cvt_fac
     real(kind(0d0)) :: pi_fac !< Factor for artificial pi_inf
+    logical :: coupling
 
     ! Perturb density of surrounding air so as to break symmetry of grid
     logical :: perturb_flow
@@ -388,7 +391,12 @@ contains
 
         ! surface tension modeling
         sigma = dflt_real
+
+        no_energy_eq = .false.
+        cvt = dflt_real
+        cvt_fac = 1d0
         pi_fac = 1d0
+        coupling = .true.
 
         ! Immersed Boundaries
         ib = .false.

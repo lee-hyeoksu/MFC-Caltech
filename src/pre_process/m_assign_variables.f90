@@ -420,7 +420,8 @@ contains
                 do i = 1, nb
                     R3bar = R3bar + weight(i)*(q_prim_vf(bub_idx%rs(i))%sf(j, k, l))**3d0
                 end do
-                q_prim_vf(n_idx)%sf(j, k, l) = 3*q_prim_vf(alf_idx)%sf(j, k, l)/(4*pi*R3bar)
+                ! q_prim_vf(n_idx)%sf(j, k, l) = 3*q_prim_vf(alf_idx)%sf(j, k, l)/(4*pi*R3bar)
+                q_prim_vf(n_idx)%sf(j, k, l) = 3*1d-5/(4*pi*R3bar)
             end if
         end if
 
@@ -504,7 +505,7 @@ contains
         ! Set streamwise velocity to hyperbolic tangent function of y
         if (vel_profile) then
             q_prim_vf(1 + cont_idx%end)%sf(j, k, l) = &
-                (eta*patch_icpp(patch_id)%vel(1)*tanh(y_cc(k)) &
+                (eta*patch_icpp(patch_id)%vel(1)*tanh(y_cc(k)*59d0/patch_icpp(1)%length_y) &
                  + (1d0 - eta)*orig_prim_vf(1 + cont_idx%end))
         end if
 
@@ -561,7 +562,8 @@ contains
                 do i = 1, nb
                     R3bar = R3bar + weight(i)*(q_prim_vf(bub_idx%rs(i))%sf(j, k, l))**3d0
                 end do
-                q_prim_vf(n_idx)%sf(j, k, l) = 3*q_prim_vf(alf_idx)%sf(j, k, l)/(4*pi*R3bar)
+                ! q_prim_vf(n_idx)%sf(j, k, l) = 3*q_prim_vf(alf_idx)%sf(j, k, l)/(4*pi*R3bar)
+                q_prim_vf(n_idx)%sf(j, k, l) = 3*1d-5/(4*pi*R3bar)
             end if
         end if
 
