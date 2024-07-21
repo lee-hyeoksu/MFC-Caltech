@@ -55,7 +55,7 @@ module m_bubbles
 
 contains
 
-    subroutine s_initialize_bubbles_module()
+    subroutine s_initialize_bubbles_module
 
         integer :: i, j, k, l, q
         type(int_bounds_info) :: ix, iy, iz
@@ -103,7 +103,7 @@ contains
     ! Compute the bubble volume fraction alpha from the bubble number density n
         !! @param q_cons_vf is the conservative variable
     subroutine s_comp_alpha_from_n(q_cons_vf)
-        type(scalar_field), dimension(sys_size), intent(INOUT) :: q_cons_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         real(kind(0d0)) :: nR3bar
         integer(kind(0d0)) :: i, j, k, l
 
@@ -130,8 +130,9 @@ contains
 
     subroutine s_compute_bubbles_rhs(idir, q_prim_vf)
 
-        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
-        integer :: idir
+        integer, intent(in) :: idir
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
+
         integer :: i, j, k, l, q
 
         if (idir == 1) then
@@ -187,12 +188,6 @@ contains
         !!      that are needed for the bubble modeling
         !!  @param q_prim_vf Primitive variables
         !!  @param q_cons_vf Conservative variables
-        !!  @param divu Divergence of velocity
-        !!  @param bub_adv_src Advection equation source due to bubble compression/expansion
-        !!  @param bub_r_src   Bubble radius equation source
-        !!  @param bub_v_src   Bubble velocity equation source
-        !!  @param bub_p_src   Bubble pressure equation source
-        !!  @param bub_m_src   Bubble mass equation source
     subroutine s_compute_bubble_source(q_cons_vf, q_prim_vf, t_step, rhs_vf)
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
         type(scalar_field), dimension(sys_size), intent(INOUT) :: rhs_vf, q_cons_vf
@@ -219,7 +214,7 @@ contains
         real(kind(0d0)) :: err1, err2, err3, err4, err5 !< Error estimates for adaptive time stepping
         real(kind(0d0)) :: t_new !< Updated time step size
         real(kind(0d0)) :: h !< Time step size
-        real(kind(0d0)), dimension(4) :: myR_tmp1, myV_tmp1, myR_tmp2, myV_tmp2, myR_tmp3, myV_tmp3!< Bubble radius, radial velocity, and radial acceleration for the inner loop
+        real(kind(0d0)), dimension(4) :: myR_tmp1, myV_tmp1, myR_tmp2, myV_tmp2 !< Bubble radius, radial velocity, and radial acceleration for the inner loop
 
         !$acc parallel loop collapse(3) gang vector default(present)
         do l = 0, p
@@ -238,7 +233,7 @@ contains
             end do
         end do
 
-        !$acc parallel loop collapse(3) gang vector default(present) private(Rtmp, Vtmp, myalpha_rho, myalpha, myR_tmp, myV_tmp, myA_tmp)
+        !$acc parallel loop collapse(3) gang vector default(present) private(Rtmp, Vtmp, myalpha_rho, myalpha, myR_tmp1, myV_tmp1, myR_tmp2, myV_tmp2)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -389,6 +384,10 @@ contains
                                         ! call s_compute_pressure(myE)
                                         ! myP = myRho/(1d0 - alf)*(cvt/cvt_fac)/gammas(1) - pi_infs(1)/pi_fac/(gammas(1)+1d0)
 
+                                        ! Update R and V
+                                        myR = myR_tmp1(4)
+                                        myV = myV_tmp1(4)
+
                                         ! Update step size for the next sub-step
                                         h = h*min(2d0, max(0.5d0, (1d-4/err1)**(1d0/3d0)))
 
@@ -400,7 +399,7 @@ contains
                                         else
                                             h = 0.25d0*h
                                         end if
-                                        
+
                                         iter2 = iter2 + 1
                                     end if
 
@@ -423,7 +422,6 @@ contains
                                     print *, "iter1 > 100", j, k, l
                                     stop "iter1 > 100"
                                 end if 
-
                             end do
 
                             q_cons_vf(rs(q))%sf(j, k, l) = nbub*myR
@@ -474,8 +472,25 @@ contains
         end if
     end subroutine s_compute_bubble_source
 
+    !> Choose the initial time step size for the adaptive time stepping routine
+        !!  (See Heirer, E. Hairer S.P.Nørsett G. Wanner, Solving Ordinary
+        !!  Differential Equations I, Chapter II.4)
+        !!  @param fRho Current density
+        !!  @param fP Current driving pressure
+        !!  @param fR Current bubble radius
+        !!  @param fV Current bubble velocity
+        !!  @param fR0 Equilibrium bubble radius
+        !!  @param fpb Internal bubble pressure
+        !!  @param fpbdot Time-derivative of internal bubble pressure
+        !!  @param alf bubble volume fraction
+        !!  @param fntait Tait EOS parameter
+        !!  @param fBtait Tait EOS parameter
+        !!  @param f_bub_adv_src Source for bubble volume fraction
+        !!  @param f_divu Divergence of velocity
+        !!  @param h Time step size
     subroutine s_initialize_adap_dt(fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, &
                                     fntait, fBtait, f_bub_adv_src, f_divu, h)
+        !$acc routine seq
         real(kind(0d0)), intent(IN) :: fRho, fP, fR, fV, fR0, fpb, fpbdot, alf
         real(kind(0d0)), intent(IN) :: fntait, fBtait, f_bub_adv_src, f_divu
         real(kind(0d0)), intent(out) :: h
@@ -489,8 +504,8 @@ contains
         myR_tmp(1) = fR
         myV_tmp(1) = fV
         myA_tmp(1) = f_rddot(fRho, fP, myR_tmp(1), myV_tmp(1), fR0, &
-                                fpb, fpbdot, alf, fntait, fBtait, &
-                                f_bub_adv_src, f_divu)
+                             fpb, fpbdot, alf, fntait, fBtait, &
+                             f_bub_adv_src, f_divu)
 
         ! Compute d0 = ||y0|| and d1 = ||f(x0,y0)||
         d0 = DSQRT((myR_tmp(1)**2d0 + myV_tmp(1)**2d0)/2d0)
@@ -505,8 +520,8 @@ contains
         myR_tmp(2) = myR_tmp(1) + h0*myV_tmp(1)
         myV_tmp(2) = myV_tmp(1) + h0*myA_tmp(1)
         myA_tmp(2) = f_rddot(fRho, fP, myR_tmp(2), myV_tmp(2), fR0, &
-                                fpb, fpbdot, alf, fntait, fBtait, &
-                                f_bub_adv_src, f_divu)
+                             fpb, fpbdot, alf, fntait, fBtait, &
+                             f_bub_adv_src, f_divu)
 
         ! Compute d2 = ||f(x0+h0,y0+h0*f(x0,y0))-f(x0,y0)||/h0
         d2 = DSQRT(((myV_tmp(2) - myV_tmp(1))**2d0 + (myA_tmp(2) - myA_tmp(1))**2d0)/2d0)/h0
@@ -521,12 +536,30 @@ contains
 
         ! Set h = min(100*h0,h1)
         h = min(100d0*h0, h1)
-        
+
     end subroutine s_initialize_adap_dt
 
+    !>  Integrate bubble variables over the given time step size, h
+        !!  @param fRho Current density
+        !!  @param fP Current driving pressure
+        !!  @param fR Current bubble radius
+        !!  @param fV Current bubble velocity
+        !!  @param fR0 Equilibrium bubble radius
+        !!  @param fpb Internal bubble pressure
+        !!  @param fpbdot Time-derivative of internal bubble pressure
+        !!  @param alf bubble volume fraction
+        !!  @param fntait Tait EOS parameter
+        !!  @param fBtait Tait EOS parameter
+        !!  @param f_bub_adv_src Source for bubble volume fraction
+        !!  @param f_divu Divergence of velocity
+        !!  @param h Time step size
+        !!  @param myR_tmp Bubble radius at each stage
+        !!  @param myV_tmp Bubble radial velocity at each stage
+        !!  @param err Estimated error
     subroutine s_advance_substep(fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, &
-                                    fntait, fBtait, f_bub_adv_src, f_divu, h, &
-                                    myR_tmp, myV_tmp, err)
+                                 fntait, fBtait, f_bub_adv_src, f_divu, h, &
+                                 myR_tmp, myV_tmp, err)
+        !$acc routine seq
         real(kind(0d0)), intent(IN) :: fRho, fP, fR, fV, fR0, fpb, fpbdot, alf
         real(kind(0d0)), intent(IN) :: fntait, fBtait, f_bub_adv_src, f_divu, h
         real(kind(0d0)), dimension(4), intent(OUT) :: myR_tmp, myV_tmp
@@ -582,7 +615,7 @@ contains
         !!  @param fpb Internal bubble pressure
     function f_cpbw(fR0, fR, fV, fpb)
         !$acc routine seq
-        real(kind(0d0)), intent(IN) :: fR0, fR, fV, fpb
+        real(kind(0d0)), intent(in) :: fR0, fR, fV, fpb
 
         real(kind(0d0)) :: f_cpbw
 
@@ -601,7 +634,7 @@ contains
         !!  @param fBtait Tait EOS parameter
     function f_H(fCpbw, fCpinf, fntait, fBtait)
         !$acc routine seq
-        real(kind(0d0)), intent(IN) :: fCpbw, fCpinf, fntait, fBtait
+        real(kind(0d0)), intent(in) :: fCpbw, fCpinf, fntait, fBtait
 
         real(kind(0d0)) :: tmp1, tmp2, tmp3
         real(kind(0d0)) :: f_H
@@ -621,7 +654,7 @@ contains
         !! @param fH Bubble enthalpy
     function f_cgas(fCpinf, fntait, fBtait, fH)
         !$acc routine seq
-        real(kind(0d0)), intent(IN) :: fCpinf, fntait, fBtait, fH
+        real(kind(0d0)), intent(in) :: fCpinf, fntait, fBtait, fH
 
         real(kind(0d0)) :: tmp
         real(kind(0d0)) :: f_cgas
@@ -644,7 +677,7 @@ contains
         !!  @param divu Divergence of velocity
     function f_cpinfdot(fRho, fP, falf, fntait, fBtait, advsrc, divu)
         !$acc routine seq
-        real(kind(0d0)), intent(IN) :: fRho, fP, falf, fntait, fBtait, advsrc, divu
+        real(kind(0d0)), intent(in) :: fRho, fP, falf, fntait, fBtait, advsrc, divu
 
         real(kind(0d0)) :: c2_liquid
         real(kind(0d0)) :: f_cpinfdot
@@ -668,14 +701,14 @@ contains
         !!  @param fCpinf_dot Time derivative of the driving pressure
         !!  @param fntait Tait EOS parameter
         !!  @param fBtait Tait EOS parameter
-        !!  @param fR0 Equilibrium bubble radius
         !!  @param fR Current bubble radius
         !!  @param fV Current bubble velocity
+        !!  @param fR0 Equilibrium bubble radius
         !!  @param fpbdot Time derivative of the internal bubble pressure
     function f_Hdot(fCpbw, fCpinf, fCpinf_dot, fntait, fBtait, fR, fV, fR0, fpbdot)
         !$acc routine seq
-        real(kind(0d0)), intent(IN) :: fCpbw, fCpinf, fCpinf_dot, fntait, fBtait
-        real(kind(0d0)), intent(IN) :: fR, fV, fR0, fpbdot
+        real(kind(0d0)), intent(in) :: fCpbw, fCpinf, fCpinf_dot, fntait, fBtait
+        real(kind(0d0)), intent(in) :: fR, fV, fR0, fpbdot
 
         real(kind(0d0)) :: tmp1, tmp2
         real(kind(0d0)) :: f_Hdot
@@ -716,8 +749,9 @@ contains
         !!  @param f_divu Divergence of velocity
     function f_rddot(fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, fntait, fBtait, f_bub_adv_src, f_divu)
         !$acc routine seq
-        real(kind(0d0)), intent(IN) :: fRho, fP, fR, fV, fR0, fpb, fpbdot, alf
-        real(kind(0d0)), intent(IN) :: fntait, fBtait, f_bub_adv_src, f_divu
+        real(kind(0d0)), intent(in) :: fRho, fP, fR, fV, fR0, fpb, fpbdot, alf
+        real(kind(0d0)), intent(in) :: fntait, fBtait, f_bub_adv_src, f_divu
+
         real(kind(0d0)) :: fCpbw, fCpinf, fCpinf_dot, fH, fHdot, c_gas, c_liquid
         real(kind(0d0)) :: f_rddot
 
@@ -753,7 +787,8 @@ contains
         !!  @param fCpbw Boundary wall pressure
     function f_rddot_RP(fCp, fRho, fR, fV, fR0, fCpbw)
         !$acc routine seq
-        real(kind(0d0)), intent(IN) :: fCp, fRho, fR, fV, fR0, fCpbw
+        real(kind(0d0)), intent(in) :: fCp, fRho, fR, fV, fR0, fCpbw
+
         real(kind(0d0)) :: f_rddot_RP
 
             !! rddot = (1/r) (  -3/2 rdot^2 + ((r0/r)^3\gamma - Cp)/rho )
@@ -775,8 +810,8 @@ contains
         !!  @param fBtait Tait EOS parameter
     function f_rddot_G(fCpbw, fR, fV, fH, fHdot, fcgas, fntait, fBtait)
         !$acc routine seq
-        real(kind(0d0)), intent(IN) :: fCpbw, fR, fV, fH, fHdot
-        real(kind(0d0)), intent(IN) :: fcgas, fntait, fBtait
+        real(kind(0d0)), intent(in) :: fCpbw, fR, fV, fH, fHdot
+        real(kind(0d0)), intent(in) :: fcgas, fntait, fBtait
 
         real(kind(0d0)) :: tmp1, tmp2, tmp3
         real(kind(0d0)) :: f_rddot_G
@@ -798,19 +833,20 @@ contains
         !!  @param fpb Internal bubble pressure
     function f_cpbw_KM(fR0, fR, fV, fpb)
         !$acc routine seq
-        real(kind(0d0)), intent(IN) :: fR0, fR, fV, fpb
+        real(kind(0d0)), intent(in) :: fR0, fR, fV, fpb
+
         real(kind(0d0)) :: f_cpbw_KM
 
         if (polytropic) then
             f_cpbw_KM = Ca*((fR0/fR)**(3.d0*gam)) - Ca + 1d0
-            if (Web /= dflt_real) f_cpbw_KM = f_cpbw_KM + &
-                                              (2.d0/(Web*fR0))*((fR0/fR)**(3.d0*gam))
+            if (.not. f_is_default(Web)) f_cpbw_KM = f_cpbw_KM + &
+                                                     (2.d0/(Web*fR0))*((fR0/fR)**(3.d0*gam))
         else
             f_cpbw_KM = fpb
         end if
 
-        if (Web /= dflt_real) f_cpbw_KM = f_cpbw_KM - 2.d0/(fR*Web)
-        if (Re_inv /= dflt_real) f_cpbw_KM = f_cpbw_KM - 4.d0*Re_inv*fV/fR
+        if (.not. f_is_default(Web)) f_cpbw_KM = f_cpbw_KM - 2.d0/(fR*Web)
+        if (.not. f_is_default(Re_inv)) f_cpbw_KM = f_cpbw_KM - 4.d0*Re_inv*fV/fR
 
     end function f_cpbw_KM
 
@@ -825,28 +861,29 @@ contains
         !!  @param fC Current sound speed
     function f_rddot_KM(fpbdot, fCp, fCpbw, fRho, fR, fV, fR0, fC)
         !$acc routine seq
-        real(kind(0d0)), intent(IN) :: fpbdot, fCp, fCpbw
-        real(kind(0d0)), intent(IN) :: fRho, fR, fV, fR0, fC
+        real(kind(0d0)), intent(in) :: fpbdot, fCp, fCpbw
+        real(kind(0d0)), intent(in) :: fRho, fR, fV, fR0, fC
+
         real(kind(0d0)) :: tmp1, tmp2, cdot_star
         real(kind(0d0)) :: f_rddot_KM
 
         if (polytropic) then
             cdot_star = -3d0*gam*Ca*((fR0/fR)**(3d0*gam))*fV/fR
-            if (Web /= dflt_real) cdot_star = cdot_star - &
-                                              3d0*gam*(2d0/(Web*fR0))*((fR0/fR)**(3d0*gam))*fV/fR
+            if (.not. f_is_default(Web)) cdot_star = cdot_star - &
+                                                     3d0*gam*(2d0/(Web*fR0))*((fR0/fR)**(3d0*gam))*fV/fR
         else
             cdot_star = fpbdot
         end if
 
-        if (Web /= dflt_real) cdot_star = cdot_star + (2d0/Web)*fV/(fR**2d0)
-        if (Re_inv /= dflt_real) cdot_star = cdot_star + 4d0*Re_inv*((fV/fR)**2d0)
+        if (.not. f_is_default(Web)) cdot_star = cdot_star + (2d0/Web)*fV/(fR**2d0)
+        if (.not. f_is_default(Re_inv)) cdot_star = cdot_star + 4d0*Re_inv*((fV/fR)**2d0)
 
         tmp1 = fV/fC
         tmp2 = 1.5d0*(fV**2d0)*(tmp1/3d0 - 1d0) + &
                (1d0 + tmp1)*(fCpbw - fCp)/fRho + &
                cdot_star*fR/(fRho*fC)
 
-        if (Re_inv == dflt_real) then
+        if (f_is_default(Re_inv)) then
             f_rddot_KM = tmp2/(fR*(1d0 - tmp1))
         else
             f_rddot_KM = tmp2/(fR*(1d0 - tmp1) + 4d0*Re_inv/(fRho*fC))
@@ -856,11 +893,11 @@ contains
 
     !>  Subroutine that computes bubble wall properties for vapor bubbles
         !!  @param pb Internal bubble pressure
-    !!  @param iR0 Current bubble size index
+        !!  @param iR0 Current bubble size index
     subroutine s_bwproperty(pb, iR0)
         !$acc routine seq
-        real(kind(0.d0)), intent(IN) :: pb
-        integer, intent(IN) :: iR0
+        real(kind(0.d0)), intent(in) :: pb
+        integer, intent(in) :: iR0
 
         real(kind(0.d0)) :: x_vw
 
@@ -882,10 +919,10 @@ contains
         !!  @param iR0 Bubble size index
     function f_vflux(fR, fV, fmass_v, iR0)
         !$acc routine seq
-        real(kind(0.d0)), intent(IN) :: fR
-        real(kind(0.d0)), intent(IN) :: fV
-        real(kind(0.d0)), intent(IN) :: fmass_v
-        integer, intent(IN) :: iR0
+        real(kind(0.d0)), intent(in) :: fR
+        real(kind(0.d0)), intent(in) :: fV
+        real(kind(0.d0)), intent(in) :: fmass_v
+        integer, intent(in) :: iR0
 
         real(kind(0.d0)) :: chi_bar
         real(kind(0.d0)) :: grad_chi
@@ -913,12 +950,12 @@ contains
         !!  @param iR0 Bubble size index
     function f_bpres_dot(fvflux, fR, fV, fpb, fmass_v, iR0)
         !$acc routine seq
-        real(kind(0.d0)), intent(IN) :: fvflux
-        real(kind(0.d0)), intent(IN) :: fR
-        real(kind(0.d0)), intent(IN) :: fV
-        real(kind(0.d0)), intent(IN) :: fpb
-        real(kind(0.d0)), intent(IN) :: fmass_v
-        integer, intent(IN) :: iR0
+        real(kind(0.d0)), intent(in) :: fvflux
+        real(kind(0.d0)), intent(in) :: fR
+        real(kind(0.d0)), intent(in) :: fV
+        real(kind(0.d0)), intent(in) :: fpb
+        real(kind(0.d0)), intent(in) :: fmass_v
+        integer, intent(in) :: iR0
 
         real(kind(0.d0)) :: T_bar
         real(kind(0.d0)) :: grad_T
