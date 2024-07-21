@@ -100,7 +100,6 @@ contains
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         real(kind(0d0)) :: pi_inf, gamma, lit_gamma
-        real(kind(0d0)) :: H
         integer :: i, j, k !< Generic loop operators
 
         pi_inf = fluid_pp(1)%pi_inf
@@ -131,10 +130,6 @@ contains
                 x_boundary%end >= x_cc(i) .and. &
                 patch_icpp(patch_id)%alter_patch(patch_id_fp(i, 0, 0))) then
 
-                if (patch_icpp(patch_id)%smoothen) then
-                    eta = 5d-1 + 5d-1*tanh(30*(0.25d0*length_x-abs(x_cc(i)))/length_x)
-                end if
-
                 call s_assign_patch_primitive_variables(patch_id, i, 0, 0, &
                                                         eta, q_prim_vf, patch_id_fp)
 
@@ -147,7 +142,6 @@ contains
         end do
 
     end subroutine s_line_segment
-
 
     !>  The spiral patch is a 2D geometry that may be used, The geometry
         !!              of the patch is well-defined when its centroid and radius

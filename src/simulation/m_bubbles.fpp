@@ -378,11 +378,6 @@ contains
                                         
                                         myR = myR_tmp1(4)
                                         myV = myV_tmp1(4)
-                                        
-                                        ! alf = nbub*(4d0*pi/3d0)*myR**3
-
-                                        ! call s_compute_pressure(myE)
-                                        ! myP = myRho/(1d0 - alf)*(cvt/cvt_fac)/gammas(1) - pi_infs(1)/pi_fac/(gammas(1)+1d0)
 
                                         ! Update R and V
                                         myR = myR_tmp1(4)

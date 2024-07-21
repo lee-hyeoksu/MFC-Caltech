@@ -1887,22 +1887,20 @@ contains
                                         + (s_M/s_L)*(s_P/s_R)*dir_flg(idxi)*pcorr
                                 end do
 
-                                if (.not. no_energy_eq) then
-                                    ! Energy flux.
-                                    ! f = u*(E+p), q = E, q_star = \xi*E+(s-u)(\rho s_star + p/(s-u))
-                                    flux_rs${XYZ}$_vf(j, k, l, E_idx) = &
-                                        xi_M*(vel_L(idx1)*(E_L + pres_L - ptilde_L) + &
-                                            s_M*(xi_L*(E_L + (s_S - vel_L(idx1))* &
-                                                        (rho_L*s_S + (pres_L - ptilde_L)/ &
-                                                        (s_L - vel_L(idx1)))) - E_L)) &
-                                                        !   + (s_M/s_L)*(s_P/s_R)*pcorr*s_S*s_L/(s_L - s_S)) &
-                                        + xi_P*(vel_R(idx1)*(E_R + pres_R - ptilde_R) + &
-                                                s_P*(xi_R*(E_R + (s_S - vel_R(idx1))* &
-                                                        (rho_R*s_S + (pres_R - ptilde_R)/ &
-                                                            (s_R - vel_R(idx1)))) - E_R)) &
-                                                            ! + (s_M/s_L)*(s_P/s_R)*pcorr*s_S*s_R/(s_R - s_S))
-                                        + (s_M/s_L)*(s_P/s_R)*pcorr*s_S
-                                end if
+                                ! Energy flux.
+                                ! f = u*(E+p), q = E, q_star = \xi*E+(s-u)(\rho s_star + p/(s-u))
+                                flux_rs${XYZ}$_vf(j, k, l, E_idx) = &
+                                    xi_M*(vel_L(idx1)*(E_L + pres_L - ptilde_L) + &
+                                        s_M*(xi_L*(E_L + (s_S - vel_L(idx1))* &
+                                                    (rho_L*s_S + (pres_L - ptilde_L)/ &
+                                                    (s_L - vel_L(idx1)))) - E_L)) &
+                                                    !   + (s_M/s_L)*(s_P/s_R)*pcorr*s_S*s_L/(s_L - s_S)) &
+                                    + xi_P*(vel_R(idx1)*(E_R + pres_R - ptilde_R) + &
+                                            s_P*(xi_R*(E_R + (s_S - vel_R(idx1))* &
+                                                    (rho_R*s_S + (pres_R - ptilde_R)/ &
+                                                        (s_R - vel_R(idx1)))) - E_R)) &
+                                                        ! + (s_M/s_L)*(s_P/s_R)*pcorr*s_S*s_R/(s_R - s_S))
+                                    + (s_M/s_L)*(s_P/s_R)*pcorr*s_S
 
                                 if (coupling) then
                                     ! Volume fraction flux
@@ -2250,20 +2248,18 @@ contains
                                     ! if (j==0) print*, 'flux_rs_vf', flux_rs_vf(cont_idx%end+dir_idx(i))%sf(j,k,l)
                                 end do
 
-                                if (.not. no_energy_eq) then
-                                    ! Energy flux.
-                                    ! f = u*(E+p), q = E, q_star = \xi*E+(s-u)(\rho s_star + p/(s-u))
-                                    flux_rs${XYZ}$_vf(j, k, l, E_idx) = &
-                                        xi_M*(vel_L(idx1)*(E_L + pres_L) + &
-                                            s_M*(xi_L*(E_L + (s_S - vel_L(idx1))* &
-                                                        (rho_L*s_S + pres_L/ &
-                                                        (s_L - vel_L(idx1)))) - E_L)) &
-                                        + xi_P*(vel_R(idx1)*(E_R + pres_R) + &
-                                                s_P*(xi_R*(E_R + (s_S - vel_R(idx1))* &
-                                                        (rho_R*s_S + pres_R/ &
-                                                            (s_R - vel_R(idx1)))) - E_R)) &
-                                        + (s_M/s_L)*(s_P/s_R)*pcorr*s_S
-                                end if
+                                ! Energy flux.
+                                ! f = u*(E+p), q = E, q_star = \xi*E+(s-u)(\rho s_star + p/(s-u))
+                                flux_rs${XYZ}$_vf(j, k, l, E_idx) = &
+                                    xi_M*(vel_L(idx1)*(E_L + pres_L) + &
+                                        s_M*(xi_L*(E_L + (s_S - vel_L(idx1))* &
+                                                    (rho_L*s_S + pres_L/ &
+                                                    (s_L - vel_L(idx1)))) - E_L)) &
+                                    + xi_P*(vel_R(idx1)*(E_R + pres_R) + &
+                                            s_P*(xi_R*(E_R + (s_S - vel_R(idx1))* &
+                                                    (rho_R*s_S + pres_R/ &
+                                                        (s_R - vel_R(idx1)))) - E_R)) &
+                                    + (s_M/s_L)*(s_P/s_R)*pcorr*s_S
 
                                 ! Volume fraction flux
                                 !$acc loop seq

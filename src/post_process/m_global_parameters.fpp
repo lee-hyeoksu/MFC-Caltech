@@ -152,9 +152,6 @@ module m_global_parameters
 
     real(kind(0d0)), allocatable, dimension(:) :: adv !< Advection variables
 
-    real(kind(0d0)), allocatable, dimension(:, :, :) :: cvt_true
-    real(kind(0d0)), allocatable, dimension(:, :, :) :: cvt_arti
-
     ! Formatted Database File(s) Structure Parameters ==========================
 
     integer :: format !< Format of the database file(s)
@@ -251,8 +248,6 @@ module m_global_parameters
     real(kind(0d0)) :: sigma
     !> #}
 
-    logical :: no_energy_eq
-    real(kind(0d0)) :: cvt, cvt_fac
     real(kind(0d0)) :: pi_fac
 
     !> @name Index variables used for m_variables_conversion
@@ -366,9 +361,6 @@ contains
         sigma = dflt_real
         adv_n = .false.
 
-        no_energy_eq = .false.
-        cvt = dflt_real
-        cvt_fac = 1d0
         pi_fac = 1d0
 
     end subroutine s_assign_default_values_to_user_inputs
@@ -694,9 +686,6 @@ contains
 
         allocate (adv(num_fluids))
 
-        allocate (cvt_arti(0:m, 0:n, 0:p))
-        allocate (cvt_true(0:m, 0:n, 0:p))
-
         if (cyl_coord .neqv. .true.) then ! Cartesian grid
             grid_geometry = 1
         elseif (cyl_coord .and. p == 0) then ! Axisymmetric cylindrical grid
@@ -761,9 +750,6 @@ contains
         deallocate (proc_coords)
 
         deallocate (adv)
-
-        deallocate (cvt_true)
-        deallocate (cvt_arti)
 
 #ifdef MFC_MPI
 
