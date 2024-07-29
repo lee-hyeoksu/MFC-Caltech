@@ -160,7 +160,9 @@ contains
             relax, relax_model, &
             palpha_eps, ptgalpha_eps, &
             R0_type, file_per_process, sigma, &
-            pi_fac, adv_n, adap_dt, bf_x, bf_y, bf_z, &
+            pi_fac, adv_n, adap_dt, coupling, &
+            artificial_Ma, apc, &
+            bf_x, bf_y, bf_z, &
             k_x, k_y, k_z, w_x, w_y, w_z, p_x, p_y, p_z, &
             g_x, g_y, g_z
 
@@ -1198,6 +1200,7 @@ contains
                         do j = 0, m
                             if (ieee_is_nan(q_cons_ts(1)%vf(i)%sf(j, k, l))) then
                                 print *, "NaN(s) in timestep output.", j, k, l, i, proc_rank, t_step, m, n, p
+                                print *, x_cc(j)
                                 error stop "NaN(s) in timestep output."
                             end if
                         end do

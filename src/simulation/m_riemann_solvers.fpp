@@ -353,6 +353,7 @@ contains
             flux_vf, flux_src_vf, &
             flux_gsrc_vf, &
             norm_dir, ix, iy, iz)
+
         #:for NORM_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
 
             if (norm_dir == ${NORM_DIR}$) then
@@ -852,6 +853,7 @@ contains
         real(kind(0d0)) :: qv_L, qv_R
         real(kind(0d0)) :: c_L, c_R
         real(kind(0d0)), dimension(2) :: Re_L, Re_R
+        real(kind(0d0)) :: vel_L_sum, vel_R_sum
 
         real(kind(0d0)) :: rho_avg
         real(kind(0d0)), dimension(num_dims) :: vel_avg
@@ -862,6 +864,7 @@ contains
         real(kind(0d0)) :: s_L, s_R, s_M, s_P, s_S
         real(kind(0d0)) :: xi_L, xi_R !< Left and right wave speeds functions
         real(kind(0d0)) :: xi_M, xi_P
+        real(kind(0d0)) :: pcorr !< Anti-dissipation pressure correction term
 
         real(kind(0d0)) :: nbub_L, nbub_R
         real(kind(0d0)), dimension(nb) :: R0_L, R0_R
@@ -1520,6 +1523,8 @@ contains
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
 
+                                idx1 = 1; if (dir_idx(1) == 2) idx1 = 2; if (dir_idx(1) == 3) idx1 = 3
+
                                 !$acc loop seq
                                 do i = 1, num_fluids
                                     alpha_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)
@@ -1631,9 +1636,10 @@ contains
                                     end if
                                 end if
 
-                                E_L = gamma_L*pres_L + pi_inf_L + 5d-1*rho_L*vel_L_rms
-
-                                E_R = gamma_R*pres_R + pi_inf_R + 5d-1*rho_R*vel_R_rms
+                                E_L = (1d0 - alpha_L(num_fluids))*(gamma_L*pres_L + pi_inf_L) + 5d-1*rho_L*vel_L_rms
+                                E_R = (1d0 - alpha_R(num_fluids))*(gamma_R*pres_R + pi_inf_R) + 5d-1*rho_R*vel_R_rms
+                                ! E_L = (gamma_L*pres_L + pi_inf_L) + 5d-1*rho_L*vel_L_rms
+                                ! E_R = (gamma_R*pres_R + pi_inf_R) + 5d-1*rho_R*vel_R_rms
 
                                 H_L = (E_L + pres_L)/rho_L
                                 H_R = (E_R + pres_R)/rho_R
@@ -1672,67 +1678,72 @@ contains
                                         nbub_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, bubxb)
                                     end if
 
-                                    !$acc loop seq
-                                    do i = 1, nb
-                                        if (.not. qbmm) then
-                                            if (polytropic) then
-                                                pbw_L(i) = f_cpbw_KM(R0(i), R0_L(i), V0_L(i), 0d0)
-                                                pbw_R(i) = f_cpbw_KM(R0(i), R0_R(i), V0_R(i), 0d0)
-                                            else
-                                                pbw_L(i) = f_cpbw_KM(R0(i), R0_L(i), V0_L(i), P0_L(i))
-                                                pbw_R(i) = f_cpbw_KM(R0(i), R0_R(i), V0_R(i), P0_R(i))
-                                            end if
-                                        end if
-                                    end do
-
-                                    if (qbmm) then
-                                        PbwR3Lbar = mom_sp_rs${XYZ}$_vf(j, k, l, 4)
-                                        PbwR3Rbar = mom_sp_rs${XYZ}$_vf(j + 1, k, l, 4)
-
-                                        R3Lbar = mom_sp_rs${XYZ}$_vf(j, k, l, 1)
-                                        R3Rbar = mom_sp_rs${XYZ}$_vf(j + 1, k, l, 1)
-
-                                        R3V2Lbar = mom_sp_rs${XYZ}$_vf(j, k, l, 3)
-                                        R3V2Rbar = mom_sp_rs${XYZ}$_vf(j + 1, k, l, 3)
-                                    else
-
-                                        PbwR3Lbar = 0d0
-                                        PbwR3Rbar = 0d0
-
-                                        R3Lbar = 0d0
-                                        R3Rbar = 0d0
-
-                                        R3V2Lbar = 0d0
-                                        R3V2Rbar = 0d0
-
+                                    if (coupling) then
                                         !$acc loop seq
                                         do i = 1, nb
-                                            PbwR3Lbar = PbwR3Lbar + pbw_L(i)*(R0_L(i)**3.d0)*weight(i)
-                                            PbwR3Rbar = PbwR3Rbar + pbw_R(i)*(R0_R(i)**3.d0)*weight(i)
-
-                                            R3Lbar = R3Lbar + (R0_L(i)**3.d0)*weight(i)
-                                            R3Rbar = R3Rbar + (R0_R(i)**3.d0)*weight(i)
-
-                                            R3V2Lbar = R3V2Lbar + (R0_L(i)**3.d0)*(V0_L(i)**2.d0)*weight(i)
-                                            R3V2Rbar = R3V2Rbar + (R0_R(i)**3.d0)*(V0_R(i)**2.d0)*weight(i)
+                                            if (.not. qbmm) then
+                                                if (polytropic) then
+                                                    pbw_L(i) = f_cpbw_KM(R0(i), R0_L(i), V0_L(i), 0d0)
+                                                    pbw_R(i) = f_cpbw_KM(R0(i), R0_R(i), V0_R(i), 0d0)
+                                                else
+                                                    pbw_L(i) = f_cpbw_KM(R0(i), R0_L(i), V0_L(i), P0_L(i))
+                                                    pbw_R(i) = f_cpbw_KM(R0(i), R0_R(i), V0_R(i), P0_R(i))
+                                                end if
+                                            end if
                                         end do
-                                    end if
 
-                                    if (qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + num_fluids) < small_alf .or. R3Lbar < small_alf) then
-                                        ptilde_L = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + num_fluids)*pres_L
+                                        if (qbmm) then
+                                            PbwR3Lbar = mom_sp_rs${XYZ}$_vf(j, k, l, 4)
+                                            PbwR3Rbar = mom_sp_rs${XYZ}$_vf(j + 1, k, l, 4)
+
+                                            R3Lbar = mom_sp_rs${XYZ}$_vf(j, k, l, 1)
+                                            R3Rbar = mom_sp_rs${XYZ}$_vf(j + 1, k, l, 1)
+
+                                            R3V2Lbar = mom_sp_rs${XYZ}$_vf(j, k, l, 3)
+                                            R3V2Rbar = mom_sp_rs${XYZ}$_vf(j + 1, k, l, 3)
+                                        else
+
+                                            PbwR3Lbar = 0d0
+                                            PbwR3Rbar = 0d0
+
+                                            R3Lbar = 0d0
+                                            R3Rbar = 0d0
+
+                                            R3V2Lbar = 0d0
+                                            R3V2Rbar = 0d0
+
+                                            !$acc loop seq
+                                            do i = 1, nb
+                                                PbwR3Lbar = PbwR3Lbar + pbw_L(i)*(R0_L(i)**3.d0)*weight(i)
+                                                PbwR3Rbar = PbwR3Rbar + pbw_R(i)*(R0_R(i)**3.d0)*weight(i)
+
+                                                R3Lbar = R3Lbar + (R0_L(i)**3.d0)*weight(i)
+                                                R3Rbar = R3Rbar + (R0_R(i)**3.d0)*weight(i)
+
+                                                R3V2Lbar = R3V2Lbar + (R0_L(i)**3.d0)*(V0_L(i)**2.d0)*weight(i)
+                                                R3V2Rbar = R3V2Rbar + (R0_R(i)**3.d0)*(V0_R(i)**2.d0)*weight(i)
+                                            end do
+                                        end if
+
+                                        if (qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + num_fluids) < small_alf .or. R3Lbar < small_alf) then
+                                            ptilde_L = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + num_fluids)*pres_L
+                                        else
+                                            ptilde_L = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + num_fluids)*(pres_L - PbwR3Lbar/R3Lbar - &
+                                                                                                        rho_L*R3V2Lbar/R3Lbar)
+                                        end if
+
+                                        if (qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + num_fluids) < small_alf .or. R3Rbar < small_alf) then
+                                            ptilde_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + num_fluids)*pres_R
+                                        else
+                                            ptilde_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + num_fluids)*(pres_R - PbwR3Rbar/R3Rbar - &
+                                                                                                            rho_R*R3V2Rbar/R3Rbar)
+                                        end if
+
+                                        if ((ptilde_L /= ptilde_L) .or. (ptilde_R /= ptilde_R)) then
+                                        end if
                                     else
-                                        ptilde_L = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + num_fluids)*(pres_L - PbwR3Lbar/R3Lbar - &
-                                                                                                      rho_L*R3V2Lbar/R3Lbar)
-                                    end if
-
-                                    if (qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + num_fluids) < small_alf .or. R3Rbar < small_alf) then
-                                        ptilde_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + num_fluids)*pres_R
-                                    else
-                                        ptilde_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + num_fluids)*(pres_R - PbwR3Rbar/R3Rbar - &
-                                                                                                          rho_R*R3V2Rbar/R3Rbar)
-                                    end if
-
-                                    if ((ptilde_L /= ptilde_L) .or. (ptilde_R /= ptilde_R)) then
+                                        ptilde_L = 0d0
+                                        ptilde_R = 0d0
                                     end if
 
                                     rho_avg = 5d-1*(rho_L + rho_R)
@@ -1771,19 +1782,20 @@ contains
                                 end if
 
                                 if (wave_speeds == 1) then
-                                    s_L = min(vel_L(dir_idx(1)) - c_L, vel_R(dir_idx(1)) - c_R)
-                                    s_R = max(vel_R(dir_idx(1)) + c_R, vel_L(dir_idx(1)) + c_L)
+                                    s_L = min(vel_L(idx1) - c_L, vel_R(idx1) - c_R)
+                                    s_R = max(vel_R(idx1) + c_R, vel_L(idx1) + c_L)
 
-                                    s_S = (pres_R - pres_L + rho_L*vel_L(dir_idx(1))* &
-                                           (s_L - vel_L(dir_idx(1))) - &
-                                           rho_R*vel_R(dir_idx(1))* &
-                                           (s_R - vel_R(dir_idx(1)))) &
-                                          /(rho_L*(s_L - vel_L(dir_idx(1))) - &
-                                            rho_R*(s_R - vel_R(dir_idx(1))))
+                                    s_S = (pres_R - pres_L + rho_L*vel_L(idx1)* &
+                                           (s_L - vel_L(idx1)) - &
+                                           rho_R*vel_R(idx1)* &
+                                           (s_R - vel_R(idx1))) &
+                                          /(rho_L*(s_L - vel_L(idx1)) - &
+                                            rho_R*(s_R - vel_R(idx1)))
+
                                 elseif (wave_speeds == 2) then
                                     pres_SL = 5d-1*(pres_L + pres_R + rho_avg*c_avg* &
-                                                    (vel_L(dir_idx(1)) - &
-                                                     vel_R(dir_idx(1))))
+                                                    (vel_L(idx1) - &
+                                                     vel_R(idx1)))
 
                                     pres_SR = pres_SL
 
@@ -1794,10 +1806,10 @@ contains
                                                          (pres_SR/pres_R - 1d0)*pres_R/ &
                                                          ((pres_R + pi_inf_R/(1d0 + gamma_R)))))
 
-                                    s_L = vel_L(dir_idx(1)) - c_L*Ms_L
-                                    s_R = vel_R(dir_idx(1)) + c_R*Ms_R
+                                    s_L = vel_L(idx1) - c_L*Ms_L
+                                    s_R = vel_R(idx1) + c_R*Ms_R
 
-                                    s_S = 5d-1*((vel_L(dir_idx(1)) + vel_R(dir_idx(1))) + &
+                                    s_S = 5d-1*((vel_L(idx1) + vel_R(idx1)) + &
                                                 (pres_L - pres_R)/ &
                                                 (rho_avg*c_avg))
                                 end if
@@ -1808,8 +1820,8 @@ contains
 
                                 ! goes with q_star_L/R = xi_L/R * (variable)
                                 ! xi_L/R = ( ( s_L/R - u_L/R )/(s_L/R - s_star) )
-                                xi_L = (s_L - vel_L(dir_idx(1)))/(s_L - s_S)
-                                xi_R = (s_R - vel_R(dir_idx(1)))/(s_R - s_S)
+                                xi_L = (s_L - vel_L(idx1))/(s_L - s_S)
+                                xi_R = (s_R - vel_R(idx1))/(s_R - s_S)
 
                                 ! goes with numerical velocity in x/y/z directions
                                 ! xi_P/M = 0.5 +/m sgn(0.5,s_star)
@@ -1826,9 +1838,17 @@ contains
                                 do i = 1, contxe
                                     flux_rs${XYZ}$_vf(j, k, l, i) = &
                                         xi_M*qL_prim_rs${XYZ}$_vf(j, k, l, i) &
-                                        *(vel_L(dir_idx(1)) + s_M*(xi_L - 1d0)) &
+                                        *(vel_L(idx1) + s_M*(xi_L - 1d0)) &
                                         + xi_P*qR_prim_rs${XYZ}$_vf(j + 1, k, l, i) &
-                                        *(vel_R(dir_idx(1)) + s_P*(xi_R - 1d0))
+                                        *(vel_R(idx1) + s_P*(xi_R - 1d0))
+
+                                    ! if ( j >= 249 .and. j <= 250 ) write(99,*) j, "flux", flux_rs${XYZ}$_vf(j, k, l, i)
+                                    ! if ( j >= 249 .and. j <= 250 .and. xi_M == 1 ) write(99,*) j, "Riemann L", qL_prim_rs${XYZ}$_vf(j    , k, l, i), (vel_L(idx1) + s_M*(xi_L - 1d0)), vel_L(idx1), s_M, xi_L, s_S
+                                    ! if ( j >= 249 .and. j <= 250 .and. xi_P == 1 ) write(99,*) j, "Riemann R", qR_prim_rs${XYZ}$_vf(j + 1, k, l, i), (vel_R(idx1) + s_P*(xi_R - 1d0)), vel_R(idx1), s_P, xi_R, s_S
+                                    ! if ( j >= 249 .and. j <= 250 ) write(99,*) rho_L, pres_L, vel_L(idx1), s_L
+                                    ! if ( j >= 249 .and. j <= 251 ) write(99,*) rho_R, pres_R, vel_R(idx1), s_R
+                                    ! if ( j >= 249 .and. j <= 251 ) write(99,*) " "
+
                                 end do
 
                                 if (bubbles .and. (num_fluids > 1)) then
@@ -1861,7 +1881,6 @@ contains
 
                                 ! Energy flux.
                                 ! f = u*(E+p), q = E, q_star = \xi*E+(s-u)(\rho s_star + p/(s-u))
-
                                 flux_rs${XYZ}$_vf(j, k, l, E_idx) = &
                                     xi_M*(vel_L(dir_idx(1))*(E_L + pres_L - ptilde_L) + &
                                           s_M*(xi_L*(E_L + (s_S - vel_L(dir_idx(1)))* &
@@ -1873,57 +1892,60 @@ contains
                                                         (s_R - vel_R(dir_idx(1))))) - E_R)) &
                                     + (s_M/s_L)*(s_P/s_R)*pcorr*s_S
 
-                                ! Volume fraction flux
+                                if (coupling) then
+                                    ! Volume fraction flux
+                                    !$acc loop seq
+                                    do i = advxb, advxe
+                                        flux_rs${XYZ}$_vf(j, k, l, i) = &
+                                            xi_M*qL_prim_rs${XYZ}$_vf(j, k, l, i) &
+                                            *(vel_L(idx1) + s_M*(xi_L - 1d0)) &
+                                            + xi_P*qR_prim_rs${XYZ}$_vf(j + 1, k, l, i) &
+                                            *(vel_R(idx1) + s_P*(xi_R - 1d0))
+                                    end do
 
-                                !$acc loop seq
-                                do i = advxb, advxe
-                                    flux_rs${XYZ}$_vf(j, k, l, i) = &
-                                        xi_M*qL_prim_rs${XYZ}$_vf(j, k, l, i) &
-                                        *(vel_L(dir_idx(1)) + s_M*(xi_L - 1d0)) &
-                                        + xi_P*qR_prim_rs${XYZ}$_vf(j + 1, k, l, i) &
-                                        *(vel_R(dir_idx(1)) + s_P*(xi_R - 1d0))
-                                end do
+                                    ! Source for volume fraction advection equation
+                                    !$acc loop seq
+                                    do i = 1, num_dims
+                                        idxi = dir_idx(i)
+                                        vel_src_rs${XYZ}$_vf(j, k, l, idxi) = &
+                                            xi_M*(vel_L(idxi) + &
+                                                dir_flg(idxi)* &
+                                                s_M*(xi_L - 1d0)) &
+                                            + xi_P*(vel_R(idxi) + &
+                                                    dir_flg(idxi)* &
+                                                    s_P*(xi_R - 1d0))
 
-                                ! Source for volume fraction advection equation
-                                !$acc loop seq
-                                do i = 1, num_dims
-                                    vel_src_rs${XYZ}$_vf(j, k, l, dir_idx(i)) = &
-                                        xi_M*(vel_L(dir_idx(i)) + &
-                                              dir_flg(dir_idx(i))* &
-                                              s_M*(xi_L - 1d0)) &
-                                        + xi_P*(vel_R(dir_idx(i)) + &
-                                                dir_flg(dir_idx(i))* &
-                                                s_P*(xi_R - 1d0))
+                                        !IF ( (model_eqns == 4) .or. (num_fluids==1) ) vel_src_rs_vf(dir_idx(i))%sf(j,k,l) = 0d0
+                                    end do
 
-                                    !IF ( (model_eqns == 4) .or. (num_fluids==1) ) vel_src_rs_vf(idxi)%sf(j,k,l) = 0d0
-                                end do
+                                    flux_src_rs${XYZ}$_vf(j, k, l, advxb) = vel_src_rs${XYZ}$_vf(j, k, l, idx1)
+                                end if
 
-                                flux_src_rs${XYZ}$_vf(j, k, l, advxb) = vel_src_rs${XYZ}$_vf(j, k, l, dir_idx(1))
 
                                 ! Add advection flux for bubble variables
                                 !$acc loop seq
                                 do i = bubxb, bubxe
                                     flux_rs${XYZ}$_vf(j, k, l, i) = &
                                         xi_M*nbub_L*qL_prim_rs${XYZ}$_vf(j, k, l, i) &
-                                        *(vel_L(dir_idx(1)) + s_M*(xi_L - 1d0)) &
+                                        *(vel_L(idx1) + s_M*(xi_L - 1d0)) &
                                         + xi_P*nbub_R*qR_prim_rs${XYZ}$_vf(j + 1, k, l, i) &
-                                        *(vel_R(dir_idx(1)) + s_P*(xi_R - 1d0))
+                                        *(vel_R(idx1) + s_P*(xi_R - 1d0))
                                 end do
 
                                 if (qbmm) then
                                     flux_rs${XYZ}$_vf(j, k, l, bubxb) = &
                                         xi_M*nbub_L &
-                                        *(vel_L(dir_idx(1)) + s_M*(xi_L - 1d0)) &
+                                        *(vel_L(idx1) + s_M*(xi_L - 1d0)) &
                                         + xi_P*nbub_R &
-                                        *(vel_R(dir_idx(1)) + s_P*(xi_R - 1d0))
+                                        *(vel_R(idx1) + s_P*(xi_R - 1d0))
                                 end if
 
                                 if (adv_n) then
                                     flux_rs${XYZ}$_vf(j, k, l, n_idx) = &
                                         xi_M*nbub_L &
-                                        *(vel_L(dir_idx(1)) + s_M*(xi_L - 1d0)) &
+                                        *(vel_L(idx1) + s_M*(xi_L - 1d0)) &
                                         + xi_P*nbub_R &
-                                        *(vel_R(dir_idx(1)) + s_P*(xi_R - 1d0))
+                                        *(vel_R(idx1) + s_P*(xi_R - 1d0))
                                 end if
 
                                 ! Geometrical source flux for cylindrical coordinates
@@ -1935,17 +1957,17 @@ contains
                                             flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = flux_rs${XYZ}$_vf(j, k, l, i)
                                         end do
                                         ! Recalculating the radial momentum geometric source flux
-                                        flux_gsrc_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(1)) = &
-                                            xi_M*(rho_L*(vel_L(dir_idx(1))* &
-                                                         vel_L(dir_idx(1)) + &
-                                                         s_M*(xi_L*(dir_flg(dir_idx(1))*s_S + &
-                                                                    (1d0 - dir_flg(dir_idx(1)))* &
-                                                                    vel_L(dir_idx(1))) - vel_L(dir_idx(1))))) &
-                                            + xi_P*(rho_R*(vel_R(dir_idx(1))* &
-                                                           vel_R(dir_idx(1)) + &
-                                                           s_P*(xi_R*(dir_flg(dir_idx(1))*s_S + &
-                                                                      (1d0 - dir_flg(dir_idx(1)))* &
-                                                                      vel_R(dir_idx(1))) - vel_R(dir_idx(1)))))
+                                        flux_gsrc_rs${XYZ}$_vf(j, k, l, contxe + idx1) = &
+                                            xi_M*(rho_L*(vel_L(idx1)* &
+                                                         vel_L(idx1) + &
+                                                         s_M*(xi_L*(dir_flg(idx1)*s_S + &
+                                                                    (1d0 - dir_flg(idx1))* &
+                                                                    vel_L(idx1)) - vel_L(idx1)))) &
+                                            + xi_P*(rho_R*(vel_R(idx1)* &
+                                                           vel_R(idx1) + &
+                                                           s_P*(xi_R*(dir_flg(idx1)*s_S + &
+                                                                      (1d0 - dir_flg(idx1))* &
+                                                                      vel_R(idx1)) - vel_R(idx1))))
                                         ! Geometrical source of the void fraction(s) is zero
                                         !$acc loop seq
                                         do i = advxb, advxe
@@ -1961,16 +1983,16 @@ contains
                                         end do
 
                                         flux_gsrc_rs${XYZ}$_vf(j, k, l, momxb + 1) = &
-                                            -xi_M*(rho_L*(vel_L(dir_idx(1))* &
-                                                          vel_L(dir_idx(1)) + &
-                                                          s_M*(xi_L*(dir_flg(dir_idx(1))*s_S + &
-                                                                     (1d0 - dir_flg(dir_idx(1)))* &
-                                                                     vel_L(dir_idx(1))) - vel_L(dir_idx(1))))) &
-                                            - xi_P*(rho_R*(vel_R(dir_idx(1))* &
-                                                           vel_R(dir_idx(1)) + &
-                                                           s_P*(xi_R*(dir_flg(dir_idx(1))*s_S + &
-                                                                      (1d0 - dir_flg(dir_idx(1)))* &
-                                                                      vel_R(dir_idx(1))) - vel_R(dir_idx(1)))))
+                                            -xi_M*(rho_L*(vel_L(idx1)* &
+                                                          vel_L(idx1) + &
+                                                          s_M*(xi_L*(dir_flg(idx1)*s_S + &
+                                                                     (1d0 - dir_flg(idx1))* &
+                                                                     vel_L(idx1)) - vel_L(idx1)))) &
+                                            - xi_P*(rho_R*(vel_R(idx1)* &
+                                                           vel_R(idx1) + &
+                                                           s_P*(xi_R*(dir_flg(idx1)*s_S + &
+                                                                      (1d0 - dir_flg(idx1))* &
+                                                                      vel_R(idx1)) - vel_R(idx1))))
                                         flux_gsrc_rs${XYZ}$_vf(j, k, l, momxe) = flux_rs${XYZ}$_vf(j, k, l, momxb + 1)
 
                                     end if
@@ -2212,9 +2234,9 @@ contains
                                 ! f = u*(E+p), q = E, q_star = \xi*E+(s-u)(\rho s_star + p/(s-u))
                                 flux_rs${XYZ}$_vf(j, k, l, E_idx) = &
                                     xi_M*(vel_L(idx1)*(E_L + pres_L) + &
-                                          s_M*(xi_L*(E_L + (s_S - vel_L(idx1))* &
-                                                     (rho_L*s_S + pres_L/ &
-                                                      (s_L - vel_L(idx1)))) - E_L)) &
+                                        s_M*(xi_L*(E_L + (s_S - vel_L(idx1))* &
+                                                    (rho_L*s_S + pres_L/ &
+                                                    (s_L - vel_L(idx1)))) - E_L)) &
                                     + xi_P*(vel_R(idx1)*(E_R + pres_R) + &
                                             s_P*(xi_R*(E_R + (s_S - vel_R(idx1))* &
                                                        (rho_R*s_S + pres_R/ &
@@ -2349,6 +2371,7 @@ contains
                                        norm_dir, ix, iy, iz)
 
     end subroutine s_hllc_riemann_solver
+
 
     !>  The computation of parameters, the allocation of memory,
         !!      the association of pointers and/or the execution of any

@@ -248,6 +248,8 @@ module m_global_parameters
     real(kind(0d0)) :: sigma
     !> #}
 
+    real(kind(0d0)) :: pi_fac
+
     !> @name Index variables used for m_variables_conversion
     !> @{
     integer :: momxb, momxe
@@ -358,6 +360,8 @@ contains
         sigR = dflt_real
         sigma = dflt_real
         adv_n = .false.
+
+        pi_fac = 1d0
 
     end subroutine s_assign_default_values_to_user_inputs
 

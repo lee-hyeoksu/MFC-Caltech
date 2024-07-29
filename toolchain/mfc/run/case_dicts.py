@@ -48,6 +48,7 @@ COMMON = {
     'relax_model': ParamType.INT,
     'sigma': ParamType.REAL,
     'adv_n': ParamType.LOG,
+    'pi_fac': ParamType.REAL,
 }
 
 PRE_PROCESS = COMMON.copy()
@@ -73,9 +74,9 @@ PRE_PROCESS.update({
     'rhoRV': ParamType.REAL,
     'palpha_eps': ParamType.REAL,
     'ptgalpha_eps': ParamType.REAL,
-    'pi_fac': ParamType.REAL,
     'ib': ParamType.LOG,
     'num_ibs': ParamType.INT,
+    'coupling': ParamType.LOG,
 })
 
 for ib_id in range(1, 10+1):
@@ -200,16 +201,19 @@ SIMULATION.update({
     'rdma_mpi': ParamType.LOG,
     'palpha_eps': ParamType.REAL,
     'ptgalpha_eps': ParamType.REAL,
-    'pi_fac': ParamType.REAL,
     'adap_dt': ParamType.LOG,
+    'artificial_Ma': ParamType.LOG,
+    'apc': ParamType.LOG,
     'ib': ParamType.LOG,
     'num_ibs': ParamType.INT,
     'low_Mach': ParamType.INT,
+    'coupling': ParamType.LOG,
 })
 
 # NOTE: Not currently present
 # for var in [ 'advection', 'diffusion', 'reactions' ]:
 #     SIMULATION.append(f'chem_params%{var}')
+
 
 for ib_id in range(1, 10+1):
     for real_attr, ty in [("geometry", ParamType.INT), ("radius", ParamType.REAL),
@@ -236,7 +240,6 @@ for cmp in ["x", "y", "z"]:
     for var in ["k", "w", "p", "g"]:
         SIMULATION[f'{var}_{cmp}'] = ParamType.REAL
     SIMULATION[f'bf_{cmp}'] = ParamType.LOG
-
 
     for prepend in ["domain%beg", "domain%end"]:
         SIMULATION[f"{cmp}_{prepend}"] = ParamType.REAL

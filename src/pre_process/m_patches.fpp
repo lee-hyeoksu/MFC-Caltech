@@ -100,7 +100,6 @@ contains
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         real(kind(0d0)) :: pi_inf, gamma, lit_gamma
-
         integer :: i, j, k !< Generic loop operators
 
         pi_inf = fluid_pp(1)%pi_inf
@@ -969,8 +968,8 @@ contains
 
                         @:analytical()
 
-                        call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
-                                                                eta, q_prim_vf, patch_id_fp)
+                        ! call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
+                                                                ! eta, q_prim_vf, patch_id_fp)
 
                         if ((q_prim_vf(1)%sf(i, j, 0) < 1.e-10) .and. (model_eqns == 4)) then
                             !zero density, reassign according to Tait EOS

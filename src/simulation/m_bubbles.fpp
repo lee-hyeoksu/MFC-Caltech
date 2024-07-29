@@ -117,6 +117,11 @@ contains
                         nR3bar = nR3bar + weight(i)*(q_cons_vf(rs(i))%sf(j, k, l))**3d0
                     end do
                     q_cons_vf(alf_idx)%sf(j, k, l) = (4d0*pi*nR3bar)/(3d0*q_cons_vf(n_idx)%sf(j, k, l)**2d0)
+
+                    if (q_cons_vf(alf_idx)%sf(j, k, l) /= q_cons_vf(alf_idx)%sf(j, k, l)) then
+                        print *, "NaN at s_comp_alpha_from_n", j, k, l, q_cons_vf(alf_idx)%sf(j, k, l), q_cons_vf(n_idx)%sf(j, k, l), q_cons_vf(rs(1))%sf(j, k, l)
+                        stop
+                    end if
                 end do
             end do
         end do
@@ -184,10 +189,9 @@ contains
         !!  @param q_prim_vf Primitive variables
         !!  @param q_cons_vf Conservative variables
     subroutine s_compute_bubble_source(q_cons_vf, q_prim_vf, t_step, rhs_vf)
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
-        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
-        integer, intent(in) :: t_step
-        type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
+        type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
+        type(scalar_field), dimension(sys_size), intent(INOUT) :: rhs_vf, q_cons_vf
+        integer, intent(IN) :: t_step
 
         real(kind(0d0)) :: rddot
         real(kind(0d0)) :: pb, mv, vflux, pbdot
@@ -202,7 +206,9 @@ contains
 
         real(kind(0d0)), dimension(2) :: Re !< Reynolds number
 
-        integer :: i, j, k, l, q, ii !< Loop variables
+        real(kind(0d0)) :: myE, dyn_pres, dalf
+
+        integer :: i, j, k, l, q, ii, iter1, iter2 !< Loop variables
         integer :: ndirs  !< Number of coordinate directions
 
         real(kind(0d0)) :: err1, err2, err3, err4, err5 !< Error estimates for adaptive time stepping
@@ -298,11 +304,15 @@ contains
                         n_tait = 1.d0/n_tait + 1.d0 !make this the usual little 'gamma'
                         B_tait = B_tait*(n_tait - 1)/n_tait ! make this the usual pi_inf
 
-                        myRho = q_prim_vf(1)%sf(j, k, l)
-                        myP = q_prim_vf(E_idx)%sf(j, k, l)
                         alf = q_prim_vf(alf_idx)%sf(j, k, l)
                         myR = q_prim_vf(rs(q))%sf(j, k, l)
                         myV = q_prim_vf(vs(q))%sf(j, k, l)
+
+                        myRho = q_prim_vf(1)%sf(j, k, l)
+                        myP = q_prim_vf(E_idx)%sf(j, k, l)
+                        ! myE = q_cons_vf(E_idx)%sf(j, k, l)
+
+                        ! dyn_pres = 0d0
 
                         if (.not. polytropic) then
                             pb = q_prim_vf(ps(q))%sf(j, k, l)
@@ -325,6 +335,7 @@ contains
                                                       bub_adv_src(j, k, l), divu%sf(j, k, l), h)
 
                             ! Advancing one step
+                            iter1 = 1
                             t_new = 0d0
                             do while (.true.)
                                 if (t_new + h > 0.5d0*dt) then
@@ -332,39 +343,41 @@ contains
                                 end if
 
                                 ! Advancing one sub-step
+                                iter2 = 1
                                 do while (.true.)
                                     ! Advance one sub-step
                                     call s_advance_substep(myRho, myP, myR, myV, R0(q), &
-                                                           pb, pbdot, alf, n_tait, B_tait, &
-                                                           bub_adv_src(j, k, l), divu%sf(j, k, l), h, &
-                                                           myR_tmp1, myV_tmp1, err1)
+                                                      pb, pbdot, alf, n_tait, B_tait, &
+                                                      bub_adv_src(j, k, l), divu%sf(j, k, l), h, &
+                                                      myR_tmp1, myV_tmp1, err1)
 
                                     ! Advance one sub-step by advancing two half steps
                                     call s_advance_substep(myRho, myP, myR, myV, R0(q), &
-                                                           pb, pbdot, alf, n_tait, B_tait, &
-                                                           bub_adv_src(j, k, l), divu%sf(j, k, l), 0.5d0*h, &
-                                                           myR_tmp2, myV_tmp2, err2)
+                                                      pb, pbdot, alf, n_tait, B_tait, &
+                                                      bub_adv_src(j, k, l), divu%sf(j, k, l), 0.5d0*h, &
+                                                      myR_tmp2, myV_tmp2, err2)
 
                                     call s_advance_substep(myRho, myP, myR_tmp2(4), myV_tmp2(4), R0(q), &
-                                                           pb, pbdot, alf, n_tait, B_tait, &
-                                                           bub_adv_src(j, k, l), divu%sf(j, k, l), 0.5d0*h, &
-                                                           myR_tmp2, myV_tmp2, err3)
+                                                      pb, pbdot, alf, n_tait, B_tait, &
+                                                      bub_adv_src(j, k, l), divu%sf(j, k, l), 0.5d0*h, &
+                                                      myR_tmp2, myV_tmp2, err3)
 
                                     err4 = abs((myR_tmp1(4) - myR_tmp2(4))/myR_tmp1(4))
                                     err5 = abs((myV_tmp1(4) - myV_tmp2(4))/myV_tmp1(4))
                                     if (abs(myV_tmp1(4)) < 1e-12) err5 = 0d0
 
                                     ! Determine acceptance/rejection and update step size
-                                    !   Rule 1: err1, err2, err3 < tol
+                                    !   Rule 1: err1, err2, err3, err4, err5 < tol
                                     !   Rule 2: myR_tmp1(4) > 0d0
-                                    !   Rule 3: abs((myR_tmp1(4) - myR_tmp2(4))/myR) < tol
-                                    !   Rule 4: abs((myV_tmp1(4) - myV_tmp2(4))/myV) < tol
                                     if ((err1 <= 1d-4) .and. (err2 <= 1d-4) .and. (err3 <= 1d-4) &
                                         .and. (err4 < 1d-4) .and. (err5 < 1d-4) &
                                         .and. myR_tmp1(4) > 0d0) then
 
                                         ! Accepted. Finalize the sub-step
                                         t_new = t_new + h
+                                        
+                                        myR = myR_tmp1(4)
+                                        myV = myV_tmp1(4)
 
                                         ! Update R and V
                                         myR = myR_tmp1(4)
@@ -382,12 +395,28 @@ contains
                                             h = 0.25d0*h
                                         end if
 
+                                        iter2 = iter2 + 1
                                     end if
+
+                                    if (myR /= myR .or. myV /= myV) then
+                                        print *, "myR and/or myV is NaN", j, k, l, myR, myV
+                                        stop "myR and/or myV is NaN"
+                                    end if
+                                    if (iter2 > 100) then
+                                        print *, "iter2 > 100", j, k, l
+                                        stop "iter2 > 100"
+                                    end if 
                                 end do
 
                                 ! Exit the loop if the final time reached dt
                                 if (t_new == 0.5d0*dt) exit
+                                
+                                iter1 = iter1 + 1
 
+                                if (iter1 > 100) then
+                                    print *, "iter1 > 100", j, k, l
+                                    stop "iter1 > 100"
+                                end if 
                             end do
 
                             q_cons_vf(rs(q))%sf(j, k, l) = nbub*myR
@@ -401,7 +430,7 @@ contains
                             bub_r_src(j, k, l, q) = q_cons_vf(vs(q))%sf(j, k, l)
                         end if
 
-                        if (alf < 1.d-11) then
+                        if (alf < 1.d-9) then
                             bub_adv_src(j, k, l) = 0d0
                             bub_r_src(j, k, l, q) = 0d0
                             bub_v_src(j, k, l, q) = 0d0
@@ -564,8 +593,12 @@ contains
         ! Estimate error
         err_R = (-5d0*h/24d0)*(myV_tmp(2) + myV_tmp(3) - 2d0*myV_tmp(4)) &
                 /max(abs(myR_tmp(1)), abs(myR_tmp(4)))
+        if (max(abs(myR_tmp(1)), abs(myR_tmp(4))) < 1e-12) err_R = 0d0
+
         err_V = (-5d0*h/24d0)*(myA_tmp(2) + myA_tmp(3) - 2d0*myA_tmp(4)) &
                 /max(abs(myV_tmp(1)), abs(myV_tmp(4)))
+        if (max(abs(myV_tmp(1)), abs(myV_tmp(4))) < 1e-12) err_V = 0d0
+
         err = DSQRT((err_R**2d0 + err_V**2d0)/2d0)
 
     end subroutine s_advance_substep
@@ -730,7 +763,7 @@ contains
             ! Keller-Miksis bubbles
             fCpinf = fP
             fCpbw = f_cpbw_KM(fR0, fR, fV, fpb)
-            c_liquid = dsqrt(fntait*(fP + fBtait)/(fRho*(1.d0 - alf)))
+            c_liquid = dsqrt(fntait*(fP + fBtait)/fRho)/(1.d0 - alf)
             f_rddot = f_rddot_KM(fpbdot, fCpinf, fCpbw, fRho, fR, fV, fR0, c_liquid)
         else if (bubble_model == 3) then
             ! Rayleigh-Plesset bubbles
