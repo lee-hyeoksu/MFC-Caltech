@@ -881,10 +881,12 @@ contains
         real(kind(0d0)) :: R3V2Lbar, R3V2Rbar
 
         real(kind(0d0)) :: vel_L_rms, vel_R_rms, vel_avg_rms
+        real(kind(0d0)) :: vel_L_tmp, vel_R_tmp
         real(kind(0d0)) :: blkmod1, blkmod2
         real(kind(0d0)) :: rho_Star, E_Star, p_Star, p_K_Star
         real(kind(0d0)) :: pres_SL, pres_SR, Ms_L, Ms_R
         real(kind(0d0)) :: start, finish
+        real(kind(0d0)) :: zcoef, pcorr !< low Mach number correction
         integer :: i, j, k, l, q !< Generic loop iterators
         integer :: idx1, idxi
 
@@ -1513,10 +1515,10 @@ contains
                             end do
                         end do
                     end do
-
+                    !$acc end parallel loop
                 elseif (model_eqns == 2 .and. bubbles) then
                     !$acc parallel loop collapse(3) gang vector default(present) private(R0_L, R0_R, V0_L, V0_R, P0_L, P0_R, pbw_L, pbw_R, vel_L, vel_R, &
-                    !$acc rho_avg, alpha_L, alpha_R, h_avg, gamma_avg, s_L, s_R, s_S, nbub_L, nbub_R, ptilde_L, ptilde_R, vel_avg_rms, Re_L, Re_R, vel_L_sum, vel_R_sum, pcorr)
+                    !$acc rho_avg, alpha_L, alpha_R, h_avg, gamma_avg, s_L, s_R, s_S, nbub_L, nbub_R, ptilde_L, ptilde_R, vel_avg_rms, Re_L, Re_R, pcorr, zcoef, vel_L_tmp, vel_R_tmp)
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
@@ -1775,6 +1777,10 @@ contains
                                     end do
                                 end if
 
+                                if (low_Mach == 2) then
+                                    @:compute_low_Mach_correction()
+                                end if
+
                                 if (wave_speeds == 1) then
                                     s_L = min(vel_L(idx1) - c_L, vel_R(idx1) - c_R)
                                     s_R = max(vel_R(idx1) + c_R, vel_L(idx1) + c_L)
@@ -1822,23 +1828,12 @@ contains
                                 xi_M = (5d-1 + sign(5d-1, s_S))
                                 xi_P = (5d-1 - sign(5d-1, s_S))
 
-                                ! Anti-dissipation pressure correction (APC) term
-                                if (apc) then
-                                    vel_L_sum = 0d0; vel_R_sum = 0d0
-                                    !$acc loop seq
-                                    do i = 1, num_dims
-                                        vel_L_sum = vel_L_sum + vel_L(i)**2
-                                        vel_R_sum = vel_R_sum + vel_R(i)**2
-                                    end do
-                                    pcorr = rho_L*rho_R* &
-                                            (s_L-vel_L(idx1))*(s_R-vel_R(idx1))*(vel_R(idx1)-vel_L(idx1))/ &
-                                            (rho_R*(s_R-vel_R(idx1))-rho_L*(s_L-vel_L(idx1)))* &
-                                            (min(1d0,max(vel_L_sum**0.5d0/c_L,vel_R_sum**0.5d0/c_R))-1d0)
+                                if (low_Mach == 1) then
+                                    @:compute_low_Mach_correction()
                                 else
                                     pcorr = 0d0
                                 end if
 
-                                ! Mass flux
                                 !$acc loop seq
                                 do i = 1, contxe
                                     flux_rs${XYZ}$_vf(j, k, l, i) = &
@@ -1868,38 +1863,33 @@ contains
 
                                 !$acc loop seq
                                 do i = 1, num_dims
-                                    idxi = dir_idx(i)
-                                    flux_rs${XYZ}$_vf(j, k, l, contxe + idxi) = &
-                                        xi_M*(rho_L*(vel_L(idx1)* &
-                                                     vel_L(idxi) + &
-                                                     s_M*(xi_L*(dir_flg(idxi)*s_S + &
-                                                                (1d0 - dir_flg(idxi))* &
-                                                                vel_L(idxi)) - vel_L(idxi))) + &
-                                              dir_flg(idxi)*(pres_L - ptilde_L)) &
-                                            !   (s_M/s_L)*(s_P/s_R)*dir_flg(idxi)*pcorr * s_L/(s_L - s_S)) &
-                                        + xi_P*(rho_R*(vel_R(idx1)* &
-                                                       vel_R(idxi) + &
-                                                       s_P*(xi_R*(dir_flg(idxi)*s_S + &
-                                                                  (1d0 - dir_flg(idxi))* &
-                                                                  vel_R(idxi)) - vel_R(idxi))) + &
-                                                dir_flg(idxi)*(pres_R - ptilde_R)) &
-                                                ! (s_M/s_L)*(s_P/s_R)*dir_flg(idxi)*pcorr * s_R/(s_R - s_S))
-                                        + (s_M/s_L)*(s_P/s_R)*dir_flg(idxi)*pcorr
+                                    flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(i)) = &
+                                        xi_M*(rho_L*(vel_L(dir_idx(1))* &
+                                                     vel_L(dir_idx(i)) + &
+                                                     s_M*(xi_L*(dir_flg(dir_idx(i))*s_S + &
+                                                                (1d0 - dir_flg(dir_idx(i)))* &
+                                                                vel_L(dir_idx(i))) - vel_L(dir_idx(i)))) + &
+                                              dir_flg(dir_idx(i))*(pres_L - ptilde_L)) &
+                                        + xi_P*(rho_R*(vel_R(dir_idx(1))* &
+                                                       vel_R(dir_idx(i)) + &
+                                                       s_P*(xi_R*(dir_flg(dir_idx(i))*s_S + &
+                                                                  (1d0 - dir_flg(dir_idx(i)))* &
+                                                                  vel_R(dir_idx(i))) - vel_R(dir_idx(i)))) + &
+                                                dir_flg(dir_idx(i))*(pres_R - ptilde_R)) &
+                                        + (s_M/s_L)*(s_P/s_R)*dir_flg(dir_idx(i))*pcorr
                                 end do
 
                                 ! Energy flux.
                                 ! f = u*(E+p), q = E, q_star = \xi*E+(s-u)(\rho s_star + p/(s-u))
                                 flux_rs${XYZ}$_vf(j, k, l, E_idx) = &
-                                    xi_M*(vel_L(idx1)*(E_L + pres_L - ptilde_L) + &
-                                        s_M*(xi_L*(E_L + (s_S - vel_L(idx1))* &
-                                                    (rho_L*s_S + (pres_L - ptilde_L)/ &
-                                                    (s_L - vel_L(idx1)))) - E_L)) &
-                                                    !   + (s_M/s_L)*(s_P/s_R)*pcorr*s_S*s_L/(s_L - s_S)) &
-                                    + xi_P*(vel_R(idx1)*(E_R + pres_R - ptilde_R) + &
-                                            s_P*(xi_R*(E_R + (s_S - vel_R(idx1))* &
-                                                    (rho_R*s_S + (pres_R - ptilde_R)/ &
-                                                        (s_R - vel_R(idx1)))) - E_R)) &
-                                                        ! + (s_M/s_L)*(s_P/s_R)*pcorr*s_S*s_R/(s_R - s_S))
+                                    xi_M*(vel_L(dir_idx(1))*(E_L + pres_L - ptilde_L) + &
+                                          s_M*(xi_L*(E_L + (s_S - vel_L(dir_idx(1)))* &
+                                                     (rho_L*s_S + (pres_L - ptilde_L)/ &
+                                                      (s_L - vel_L(dir_idx(1))))) - E_L)) &
+                                    + xi_P*(vel_R(dir_idx(1))*(E_R + pres_R - ptilde_R) + &
+                                            s_P*(xi_R*(E_R + (s_S - vel_R(dir_idx(1)))* &
+                                                       (rho_R*s_S + (pres_R - ptilde_R)/ &
+                                                        (s_R - vel_R(dir_idx(1))))) - E_R)) &
                                     + (s_M/s_L)*(s_P/s_R)*pcorr*s_S
 
                                 if (coupling) then
@@ -2013,7 +2003,7 @@ contains
                     !$acc end parallel loop
                 else
                     !$acc parallel loop collapse(3) gang vector default(present) private(vel_L, vel_R, Re_L, Re_R, &
-                    !$acc rho_avg, h_avg, gamma_avg, alpha_L, alpha_R, s_L, s_R, s_S, vel_avg_rms, vel_L_sum, vel_R_sum, pcorr) copyin(is1,is2,is3)
+                    !$acc rho_avg, h_avg, gamma_avg, alpha_L, alpha_R, s_L, s_R, s_S, vel_avg_rms, pcorr, zcoef, vel_L_tmp, vel_R_tmp) copyin(is1,is2,is3)
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
@@ -2153,6 +2143,10 @@ contains
                                     end do
                                 end if
 
+                                if (low_Mach == 2) then
+                                    @:compute_low_Mach_correction()
+                                end if
+
                                 if (wave_speeds == 1) then
                                     s_L = min(vel_L(idx1) - c_L, vel_R(idx1) - c_R)
                                     s_R = max(vel_R(idx1) + c_R, vel_L(idx1) + c_L)
@@ -2200,23 +2194,12 @@ contains
                                 xi_M = (5d-1 + sign(5d-1, s_S))
                                 xi_P = (5d-1 - sign(5d-1, s_S))
 
-                                ! Anti-dissipation pressure correction (APC) term
-                                if (apc) then
-                                    vel_L_sum = 0d0; vel_R_sum = 0d0
-                                    !$acc loop seq
-                                    do i = 1, num_dims
-                                        vel_L_sum = vel_L_sum + vel_L(i)**2
-                                        vel_R_sum = vel_R_sum + vel_R(i)**2
-                                    end do
-                                    pcorr = rho_L*rho_R* &
-                                            (s_L-vel_L(idx1))*(s_R-vel_R(idx1))*(vel_R(idx1)-vel_L(idx1))/ &
-                                            (rho_R*(s_R-vel_R(idx1))-rho_L*(s_L-vel_L(idx1)))* &
-                                            (min(1d0,max(vel_L_sum**0.5d0/c_L,vel_R_sum**0.5d0/c_R))-1d0)
+                                if (low_Mach == 1) then
+                                    @:compute_low_Mach_correction()
                                 else
                                     pcorr = 0d0
                                 end if
 
-                                ! Mass flux
                                 !$acc loop seq
                                 do i = 1, contxe
                                     flux_rs${XYZ}$_vf(j, k, l, i) = &
@@ -2245,7 +2228,6 @@ contains
                                                                   vel_R(idxi)) - vel_R(idxi))) + &
                                                 dir_flg(idxi)*(pres_R)) &
                                         + (s_M/s_L)*(s_P/s_R)*dir_flg(idxi)*pcorr
-                                    ! if (j==0) print*, 'flux_rs_vf', flux_rs_vf(cont_idx%end+dir_idx(i))%sf(j,k,l)
                                 end do
 
                                 ! Energy flux.
@@ -2257,7 +2239,7 @@ contains
                                                     (s_L - vel_L(idx1)))) - E_L)) &
                                     + xi_P*(vel_R(idx1)*(E_R + pres_R) + &
                                             s_P*(xi_R*(E_R + (s_S - vel_R(idx1))* &
-                                                    (rho_R*s_S + pres_R/ &
+                                                       (rho_R*s_S + pres_R/ &
                                                         (s_R - vel_R(idx1)))) - E_R)) &
                                     + (s_M/s_L)*(s_P/s_R)*pcorr*s_S
 
@@ -2342,6 +2324,7 @@ contains
                             end do
                         end do
                     end do
+                    !$acc end parallel loop
                 end if
             end if
         #:endfor
