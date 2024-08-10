@@ -78,6 +78,7 @@ module m_global_parameters
     real(kind(0d0)) :: palpha_eps    !< trigger parameter for the p relaxation procedure, phase change model
     real(kind(0d0)) :: ptgalpha_eps  !< trigger parameter for the pTg relaxation procedure, phase change model
     integer :: num_fluids            !< Number of different fluids present in the flow
+    logical :: adv_alphan            !< Advection of the last volume fraction
     logical :: mpp_lim               !< Alpha limiter
     integer :: sys_size              !< Number of unknowns in the system of equations
     integer :: weno_order            !< Order of accuracy for the WENO reconstruction
@@ -275,6 +276,7 @@ contains
         palpha_eps = dflt_real
         ptgalpha_eps = dflt_real
         num_fluids = dflt_int
+        adv_alphan = .false.
         weno_order = dflt_int
 
         hypoelasticity = .false.
@@ -604,6 +606,104 @@ contains
             internalEnergies_idx%beg = adv_idx%end + 1
             internalEnergies_idx%end = adv_idx%end + num_fluids
             sys_size = internalEnergies_idx%end
+
+            if (bubbles) then
+                alf_idx = adv_idx%end
+            else
+                alf_idx = 1
+            end if
+
+            if (bubbles) then
+                bub_idx%beg = sys_size + 1
+                if (qbmm) then
+                    if (nnode == 4) then
+                        nmom = 6 !! Already set as a parameter
+                    end if
+                    bub_idx%end = adv_idx%end + nb*nmom
+                else
+                    if (.not. polytropic) then
+                        bub_idx%end = sys_size + 4*nb
+                    else
+                        bub_idx%end = sys_size + 2*nb
+                    end if
+                end if
+                sys_size = bub_idx%end
+
+                if (adv_n) then
+                    n_idx = bub_idx%end + 1
+                    sys_size = n_idx
+                end if
+
+                allocate (weight(nb), R0(nb), V0(nb))
+                allocate (bub_idx%rs(nb), bub_idx%vs(nb))
+                allocate (bub_idx%ps(nb), bub_idx%ms(nb))
+
+                if (qbmm) then
+                    allocate (bub_idx%moms(nb, nmom))
+                    allocate (bub_idx%fullmom(nb, 0:nmom, 0:nmom))
+
+                    do i = 1, nb
+                        do j = 1, nmom
+                            bub_idx%moms(i, j) = bub_idx%beg + (j - 1) + (i - 1)*nmom
+                        end do
+                        bub_idx%fullmom(i, 0, 0) = bub_idx%moms(i, 1)
+                        bub_idx%fullmom(i, 1, 0) = bub_idx%moms(i, 2)
+                        bub_idx%fullmom(i, 0, 1) = bub_idx%moms(i, 3)
+                        bub_idx%fullmom(i, 2, 0) = bub_idx%moms(i, 4)
+                        bub_idx%fullmom(i, 1, 1) = bub_idx%moms(i, 5)
+                        bub_idx%fullmom(i, 0, 2) = bub_idx%moms(i, 6)
+                        bub_idx%rs(i) = bub_idx%fullmom(i, 1, 0)
+                    end do
+                else
+                    do i = 1, nb
+                        if (.not. polytropic) then
+                            fac = 4
+                        else
+                            fac = 2
+                        end if
+
+                        bub_idx%rs(i) = bub_idx%beg + (i - 1)*fac
+                        bub_idx%vs(i) = bub_idx%rs(i) + 1
+
+                        if (.not. polytropic) then
+                            bub_idx%ps(i) = bub_idx%vs(i) + 1
+                            bub_idx%ms(i) = bub_idx%ps(i) + 1
+                        end if
+                    end do
+                end if
+
+                if (nb == 1) then
+                    weight(:) = 1d0
+                    R0(:) = 1d0
+                    V0(:) = 1d0
+                else if (nb > 1) then
+                    V0(:) = 1d0
+                    !R0 and weight initialized in s_simpson
+                else
+                    stop 'Invalid value of nb'
+                end if
+
+                !Initialize pref,rhoref for polytropic qbmm (done in s_initialize_nonpoly for non-polytropic)
+                if (.not. qbmm) then
+                    if (polytropic) then
+                        rhoref = 1.d0
+                        pref = 1.d0
+                    end if
+                end if
+
+                !Initialize pb0,pv,pref,rhoref for polytropic qbmm (done in s_initialize_nonpoly for non-polytropic)
+                if (qbmm) then
+                    if (polytropic) then
+                        allocate (pb0(nb))
+                        if ((f_is_default(Web))) then
+                            pb0 = pref
+                            pb0 = pb0/pref
+                            pref = 1d0
+                        end if
+                        rhoref = 1d0
+                    end if
+                end if
+            end if
 
             if (.not. f_is_default(sigma)) then
                 c_idx = sys_size + 1

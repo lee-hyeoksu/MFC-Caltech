@@ -134,7 +134,8 @@ contains
         ! Namelist of the global parameters which may be specified by user
         namelist /user_inputs/ case_dir, run_time_info, m, n, p, dt, &
             t_step_start, t_step_stop, t_step_save, t_step_print, &
-            model_eqns, mpp_lim, time_stepper, weno_eps, weno_flat, &
+            model_eqns, adv_alphan, &
+            mpp_lim, time_stepper, weno_eps, weno_flat, &
             riemann_flat, rdma_mpi, cu_tensor, &
             teno_CT, mp_weno, weno_avg, &
             riemann_solver, low_Mach, wave_speeds, avg_state, &
@@ -1061,12 +1062,17 @@ contains
                     call s_compute_pressure(v_vf(E_idx)%sf(j, k, l), 0d0, &
                                             dyn_pres, pi_inf, gamma, rho, qv, pres)
 
-                    do i = 1, num_fluids
-                        v_vf(i + internalEnergies_idx%beg - 1)%sf(j, k, l) = v_vf(i + adv_idx%beg - 1)%sf(j, k, l)* &
-                                                                             (fluid_pp(i)%gamma*pres + fluid_pp(i)%pi_inf) &
-                                                                             + v_vf(i + cont_idx%beg - 1)%sf(j, k, l)*fluid_pp(i)%qv
-                    end do
-
+                    if (bubbles .and. num_fluids == 1) then
+                        v_vf(internalEnergies_idx%beg)%sf(j, k, l) = (1d0 - v_vf(adv_idx%beg)%sf(j, k, l))* &
+                                                                     (fluid_pp(1)%gamma*pres + fluid_pp(1)%pi_inf) &
+                                                                     + v_vf(cont_idx%beg)%sf(j, k, l)*fluid_pp(i)%qv
+                    else
+                        do i = 1, num_fluids
+                            v_vf(i + internalEnergies_idx%beg - 1)%sf(j, k, l) = v_vf(i + adv_idx%beg - 1)%sf(j, k, l)* &
+                                                                                (fluid_pp(i)%gamma*pres + fluid_pp(i)%pi_inf) &
+                                                                                + v_vf(i + cont_idx%beg - 1)%sf(j, k, l)*fluid_pp(i)%qv
+                        end do
+                    end if
                 end do
             end do
         end do
@@ -1152,7 +1158,7 @@ contains
                 time_final = maxval(proc_time)
                 io_time_final = maxval(io_proc_time)
             end if
-            print *, "Performance: ", time_final*1.0d9/(sys_size*maxval((/1,m_glb/))*maxval((/1,n_glb/))*maxval((/1,p_glb/))), " ns/gp/eq/rhs"
+            print *, "Performance: ", time_final*1.0d9/sys_size, " ns/gp/eq/rhs"
             inquire (FILE='time_data.dat', EXIST=file_exists)
             if (file_exists) then
                 open (1, file='time_data.dat', position='append', status='old')

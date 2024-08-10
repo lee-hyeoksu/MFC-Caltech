@@ -112,6 +112,7 @@ module m_global_parameters
     #:else
         integer :: num_dims       !< Number of spatial dimensions
     #:endif
+    logical :: adv_alphan     !< Advection of the last volume fraction
     logical :: mpp_lim        !< Mixture physical parameters (MPP) limits
     integer :: time_stepper   !< Time-stepper algorithm
     logical :: prim_vars_wrt
@@ -493,6 +494,7 @@ contains
 
         ! Simulation algorithm parameters
         model_eqns = dflt_int
+        adv_alphan = .false.
         mpp_lim = .false.
         time_stepper = dflt_int
         weno_eps = dflt_real
@@ -853,6 +855,110 @@ contains
                 internalEnergies_idx%end = adv_idx%end + num_fluids
                 sys_size = internalEnergies_idx%end
 
+                if (bubbles) then
+                    alf_idx = adv_idx%end
+                else
+                    alf_idx = 1
+                end if
+
+                if (bubbles) then
+                    bub_idx%beg = sys_size + 1
+                    if (qbmm) then
+                        nmomsp = 4 !number of special moments
+                        if (nnode == 4) then
+                            ! nmom = 6 : It is already a parameter
+                            nmomtot = nmom*nb
+                        end if
+                        bub_idx%end = adv_idx%end + nb*nmom
+                    else
+                        if (.not. polytropic) then
+                            bub_idx%end = sys_size + 4*nb
+                        else
+                            bub_idx%end = sys_size + 2*nb
+                        end if
+                    end if
+                    sys_size = bub_idx%end
+                    ! print*, 'alf idx', alf_idx
+                    ! print*, 'bub -idx beg end', bub_idx%beg, bub_idx%end
+
+                    if (adv_n) then
+                        n_idx = bub_idx%end + 1
+                        sys_size = n_idx
+                    end if
+
+                    @:ALLOCATE_GLOBAL(weight(nb), R0(nb), V0(nb))
+                    @:ALLOCATE(bub_idx%rs(nb), bub_idx%vs(nb))
+                    @:ALLOCATE(bub_idx%ps(nb), bub_idx%ms(nb))
+
+                    if (num_fluids == 1) then
+                        gam = 1.d0/fluid_pp(num_fluids + 1)%gamma + 1.d0
+                    else
+                        gam = 1.d0/fluid_pp(num_fluids)%gamma + 1.d0
+                    end if
+
+                    if (qbmm) then
+                        @:ALLOCATE(bub_idx%moms(nb, nmom))
+                        do i = 1, nb
+                            do j = 1, nmom
+                                bub_idx%moms(i, j) = bub_idx%beg + (j - 1) + (i - 1)*nmom
+                            end do
+                            bub_idx%rs(i) = bub_idx%moms(i, 2)
+                            bub_idx%vs(i) = bub_idx%moms(i, 3)
+                        end do
+
+                    else
+                        do i = 1, nb
+                            if (.not. polytropic) then
+                                fac = 4
+                            else
+                                fac = 2
+                            end if
+
+                            bub_idx%rs(i) = bub_idx%beg + (i - 1)*fac
+                            bub_idx%vs(i) = bub_idx%rs(i) + 1
+
+                            if (.not. polytropic) then
+                                bub_idx%ps(i) = bub_idx%vs(i) + 1
+                                bub_idx%ms(i) = bub_idx%ps(i) + 1
+                            end if
+                        end do
+                    end if
+
+                    if (nb == 1) then
+                        weight(:) = 1d0
+                        R0(:) = 1d0
+                        V0(:) = 1d0
+                    else if (nb > 1) then
+                        V0(:) = 1d0
+                        !R0 and weight initialized in s_simpson
+                    else
+                        stop 'Invalid value of nb'
+                    end if
+
+                    !Initialize pref,rhoref for polytropic qbmm (done in s_initialize_nonpoly for non-polytropic)
+                    if (.not. qbmm) then
+                        if (polytropic) then
+                            rhoref = 1.d0
+                            pref = 1.d0
+                        end if
+                    end if
+
+                    !Initialize pb0, pv, pref, rhoref for polytropic qbmm (done in s_initialize_nonpoly for non-polytropic)
+                    if (qbmm) then
+                        if (polytropic) then
+                            pv = fluid_pp(1)%pv
+                            pv = pv/pref
+                            @:ALLOCATE_GLOBAL(pb0(nb))
+                            if ((f_is_default(Web))) then
+                                pb0 = pref
+                                pb0 = pb0/pref
+                                pref = 1d0
+                            end if
+                            rhoref = 1d0
+                        end if
+                    end if
+                end if
+                
                 if (.not. f_is_default(sigma)) then
                     c_idx = sys_size + 1
                     sys_size = c_idx

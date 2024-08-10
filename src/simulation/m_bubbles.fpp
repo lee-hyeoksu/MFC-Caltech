@@ -106,6 +106,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         real(kind(0d0)) :: nR3bar
         integer(kind(0d0)) :: i, j, k, l
+        real(kind(0d0)) :: adv_sum_res
 
         !$acc parallel loop collapse(3) gang vector default(present)
         do l = 0, p
@@ -117,6 +118,20 @@ contains
                         nR3bar = nR3bar + weight(i)*(q_cons_vf(rs(i))%sf(j, k, l))**3d0
                     end do
                     q_cons_vf(alf_idx)%sf(j, k, l) = (4d0*pi*nR3bar)/(3d0*q_cons_vf(n_idx)%sf(j, k, l)**2d0)
+
+                    if (num_fluids > 2) then
+                        adv_sum_res = 0d0
+                        !$acc loop seq
+                        do i = 1, num_fluids - 1
+                            adv_sum_res = adv_sum_res + q_cons_vf(advxb + i - 1)%sf(j, k, l)
+                        end do
+
+                        !$acc loop seq
+                        do i = 1, num_fluids - 1
+                            q_cons_vf(advxb + i - 1)%sf(j, k, l) = &
+                            q_cons_vf(advxb + i - 1)%sf(j, k, l)*(1d0 - q_cons_vf(alf_idx)%sf(j, k, l))/adv_sum_res
+                        end do
+                    end if
                 end do
             end do
         end do
@@ -231,186 +246,195 @@ contains
         do l = 0, p
             do k = 0, n
                 do j = 0, m
+                    if (q_prim_vf(alf_idx)%sf(j, k, l) .gt. 1e-12) then
+                        if (adv_n) then
+                            nbub = q_prim_vf(n_idx)%sf(j, k, l)
+                        else
+                            !$acc loop seq
+                            do q = 1, nb
+                                Rtmp(q) = q_prim_vf(rs(q))%sf(j, k, l)
+                                Vtmp(q) = q_prim_vf(vs(q))%sf(j, k, l)
+                            end do
 
-                    if (adv_n) then
-                        nbub = q_prim_vf(n_idx)%sf(j, k, l)
-                    else
+                            R3 = 0d0
+
+                            !$acc loop seq
+                            do q = 1, nb
+                                R3 = R3 + weight(q)*Rtmp(q)**3.d0
+                            end do
+
+                            nbub = (3.d0/(4.d0*pi))*q_prim_vf(alf_idx)%sf(j, k, l)/R3
+                        end if
+
+                        if (.not. adap_dt) then
+                            R2Vav = 0d0
+
+                            !$acc loop seq
+                            do q = 1, nb
+                                R2Vav = R2Vav + weight(q)*Rtmp(q)**2.d0*Vtmp(q)
+                            end do
+
+                            bub_adv_src(j, k, l) = 4.d0*pi*nbub*R2Vav
+                        end if
+
                         !$acc loop seq
                         do q = 1, nb
-                            Rtmp(q) = q_prim_vf(rs(q))%sf(j, k, l)
-                            Vtmp(q) = q_prim_vf(vs(q))%sf(j, k, l)
-                        end do
 
-                        R3 = 0d0
-
-                        !$acc loop seq
-                        do q = 1, nb
-                            R3 = R3 + weight(q)*Rtmp(q)**3.d0
-                        end do
-
-                        nbub = (3.d0/(4.d0*pi))*q_prim_vf(alf_idx)%sf(j, k, l)/R3
-                    end if
-
-                    if (.not. adap_dt) then
-                        R2Vav = 0d0
-
-                        !$acc loop seq
-                        do q = 1, nb
-                            R2Vav = R2Vav + weight(q)*Rtmp(q)**2.d0*Vtmp(q)
-                        end do
-
-                        bub_adv_src(j, k, l) = 4.d0*pi*nbub*R2Vav
-                    end if
-
-                    !$acc loop seq
-                    do q = 1, nb
-
-                        !$acc loop seq
-                        do ii = 1, num_fluids
-                            myalpha_rho(ii) = q_cons_vf(ii)%sf(j, k, l)
-                            myalpha(ii) = q_cons_vf(advxb + ii - 1)%sf(j, k, l)
-                        end do
-
-                        myRho = 0d0
-                        n_tait = 0d0
-                        B_tait = 0d0
-
-                        if (mpp_lim .and. (num_fluids > 2)) then
                             !$acc loop seq
                             do ii = 1, num_fluids
-                                myRho = myRho + myalpha_rho(ii)
-                                n_tait = n_tait + myalpha(ii)*gammas(ii)
-                                B_tait = B_tait + myalpha(ii)*pi_infs(ii)
+                                myalpha_rho(ii) = q_cons_vf(ii)%sf(j, k, l)
+                                myalpha(ii) = q_cons_vf(advxb + ii - 1)%sf(j, k, l)
                             end do
-                        else if (num_fluids > 2) then
-                            !$acc loop seq
-                            do ii = 1, num_fluids - 1
-                                myRho = myRho + myalpha_rho(ii)
-                                n_tait = n_tait + myalpha(ii)*gammas(ii)
-                                B_tait = B_tait + myalpha(ii)*pi_infs(ii)
-                            end do
-                        else
-                            myRho = myalpha_rho(1)
-                            n_tait = gammas(1)
-                            B_tait = pi_infs(1)/pi_fac
-                        end if
 
-                        n_tait = 1.d0/n_tait + 1.d0 !make this the usual little 'gamma'
-                        B_tait = B_tait*(n_tait - 1)/n_tait ! make this the usual pi_inf
+                            myRho = 0d0
+                            n_tait = 0d0
+                            B_tait = 0d0
 
-                        myRho = q_prim_vf(1)%sf(j, k, l)
-                        myP = q_prim_vf(E_idx)%sf(j, k, l)
-                        alf = q_prim_vf(alf_idx)%sf(j, k, l)
-                        myR = q_prim_vf(rs(q))%sf(j, k, l)
-                        myV = q_prim_vf(vs(q))%sf(j, k, l)
+                            if (mpp_lim .and. (num_fluids > 2)) then
+                                !$acc loop seq
+                                do ii = 1, num_fluids
+                                    myRho = myRho + myalpha_rho(ii)
+                                    n_tait = n_tait + myalpha(ii)*gammas(ii)
+                                    B_tait = B_tait + myalpha(ii)*pi_infs(ii)
+                                end do
+                            else if (num_fluids > 2) then
+                                !$acc loop seq
+                                do ii = 1, num_fluids - 1
+                                    myRho = myRho + myalpha_rho(ii)
+                                    n_tait = n_tait + myalpha(ii)*gammas(ii)
+                                    B_tait = B_tait + myalpha(ii)*pi_infs(ii)
+                                end do
+                            else
+                                myRho = myalpha_rho(1)
+                                n_tait = gammas(1)
+                                B_tait = pi_infs(1)/pi_fac
+                            end if
 
-                        if (.not. polytropic) then
-                            pb = q_prim_vf(ps(q))%sf(j, k, l)
-                            mv = q_prim_vf(ms(q))%sf(j, k, l)
-                            call s_bwproperty(pb, q)
-                            vflux = f_vflux(myR, myV, mv, q)
-                            pbdot = f_bpres_dot(vflux, myR, myV, pb, mv, q)
+                            n_tait = 1.d0/n_tait + 1.d0 !make this the usual little 'gamma'
+                            B_tait = B_tait*(n_tait - 1)/n_tait ! make this the usual pi_inf
 
-                            bub_p_src(j, k, l, q) = nbub*pbdot
-                            bub_m_src(j, k, l, q) = nbub*vflux*4.d0*pi*(myR**2.d0)
-                        else
-                            pb = 0d0; mv = 0d0; vflux = 0d0; pbdot = 0d0
-                        end if
+                            ! myRho = q_prim_vf(1)%sf(j, k, l)
+                            myP = q_prim_vf(E_idx)%sf(j, k, l)
+                            alf = q_prim_vf(alf_idx)%sf(j, k, l)
+                            myR = q_prim_vf(rs(q))%sf(j, k, l)
+                            myV = q_prim_vf(vs(q))%sf(j, k, l)
 
-                        ! Adaptive time stepping
-                        if (adap_dt) then
-                            ! Determine the starting time step
-                            call s_initialize_adap_dt(myRho, myP, myR, myV, R0(q), &
-                                                      pb, pbdot, alf, n_tait, B_tait, &
-                                                      bub_adv_src(j, k, l), divu%sf(j, k, l), h)
+                            if (.not. polytropic) then
+                                pb = q_prim_vf(ps(q))%sf(j, k, l)
+                                mv = q_prim_vf(ms(q))%sf(j, k, l)
+                                call s_bwproperty(pb, q)
+                                vflux = f_vflux(myR, myV, mv, q)
+                                pbdot = f_bpres_dot(vflux, myR, myV, pb, mv, q)
 
-                            ! Advancing one step
-                            t_new = 0d0
-                            do while (.true.)
-                                if (t_new + h > 0.5d0*dt) then
-                                    h = 0.5d0*dt - t_new
-                                end if
+                                bub_p_src(j, k, l, q) = nbub*pbdot
+                                bub_m_src(j, k, l, q) = nbub*vflux*4.d0*pi*(myR**2.d0)
+                            else
+                                pb = 0d0; mv = 0d0; vflux = 0d0; pbdot = 0d0
+                            end if
 
-                                ! Advancing one sub-step
+                            ! Adaptive time stepping
+                            if (adap_dt) then
+                                ! Determine the starting time step
+                                call s_initialize_adap_dt(myRho, myP, myR, myV, R0(q), &
+                                                        pb, pbdot, alf, n_tait, B_tait, &
+                                                        bub_adv_src(j, k, l), divu%sf(j, k, l), h)
+
+                                ! Advancing one step
+                                t_new = 0d0
                                 do while (.true.)
-                                    ! Advance one sub-step
-                                    call s_advance_substep(myRho, myP, myR, myV, R0(q), &
-                                                           pb, pbdot, alf, n_tait, B_tait, &
-                                                           bub_adv_src(j, k, l), divu%sf(j, k, l), h, &
-                                                           myR_tmp1, myV_tmp1, err1)
-
-                                    ! Advance one sub-step by advancing two half steps
-                                    call s_advance_substep(myRho, myP, myR, myV, R0(q), &
-                                                           pb, pbdot, alf, n_tait, B_tait, &
-                                                           bub_adv_src(j, k, l), divu%sf(j, k, l), 0.5d0*h, &
-                                                           myR_tmp2, myV_tmp2, err2)
-
-                                    call s_advance_substep(myRho, myP, myR_tmp2(4), myV_tmp2(4), R0(q), &
-                                                           pb, pbdot, alf, n_tait, B_tait, &
-                                                           bub_adv_src(j, k, l), divu%sf(j, k, l), 0.5d0*h, &
-                                                           myR_tmp2, myV_tmp2, err3)
-
-                                    err4 = abs((myR_tmp1(4) - myR_tmp2(4))/myR_tmp1(4))
-                                    err5 = abs((myV_tmp1(4) - myV_tmp2(4))/myV_tmp1(4))
-                                    if (abs(myV_tmp1(4)) < 1e-12) err5 = 0d0
-
-                                    ! Determine acceptance/rejection and update step size
-                                    !   Rule 1: err1, err2, err3 < tol
-                                    !   Rule 2: myR_tmp1(4) > 0d0
-                                    !   Rule 3: abs((myR_tmp1(4) - myR_tmp2(4))/myR) < tol
-                                    !   Rule 4: abs((myV_tmp1(4) - myV_tmp2(4))/myV) < tol
-                                    if ((err1 <= 1d-4) .and. (err2 <= 1d-4) .and. (err3 <= 1d-4) &
-                                        .and. (err4 < 1d-4) .and. (err5 < 1d-4) &
-                                        .and. myR_tmp1(4) > 0d0) then
-
-                                        ! Accepted. Finalize the sub-step
-                                        t_new = t_new + h
-
-                                        ! Update R and V
-                                        myR = myR_tmp1(4)
-                                        myV = myV_tmp1(4)
-
-                                        ! Update step size for the next sub-step
-                                        h = h*min(2d0, max(0.5d0, (1d-4/err1)**(1d0/3d0)))
-
-                                        exit
-                                    else
-                                        ! Rejected. Update step size for the next try on sub-step
-                                        if (err2 <= 1d-4) then
-                                            h = 0.5d0*h
-                                        else
-                                            h = 0.25d0*h
-                                        end if
-
+                                    if (t_new + h > 0.5d0*dt) then
+                                        h = 0.5d0*dt - t_new
                                     end if
+
+                                    ! Advancing one sub-step
+                                    do while (.true.)
+                                        ! Advance one sub-step
+                                        call s_advance_substep(myRho, myP, myR, myV, R0(q), &
+                                                            pb, pbdot, alf, n_tait, B_tait, &
+                                                            bub_adv_src(j, k, l), divu%sf(j, k, l), h, &
+                                                            myR_tmp1, myV_tmp1, err1)
+
+                                        ! Advance one sub-step by advancing two half steps
+                                        call s_advance_substep(myRho, myP, myR, myV, R0(q), &
+                                                            pb, pbdot, alf, n_tait, B_tait, &
+                                                            bub_adv_src(j, k, l), divu%sf(j, k, l), 0.5d0*h, &
+                                                            myR_tmp2, myV_tmp2, err2)
+
+                                        call s_advance_substep(myRho, myP, myR_tmp2(4), myV_tmp2(4), R0(q), &
+                                                            pb, pbdot, alf, n_tait, B_tait, &
+                                                            bub_adv_src(j, k, l), divu%sf(j, k, l), 0.5d0*h, &
+                                                            myR_tmp2, myV_tmp2, err3)
+
+                                        err4 = abs((myR_tmp1(4) - myR_tmp2(4))/myR_tmp1(4))
+                                        err5 = abs((myV_tmp1(4) - myV_tmp2(4))/myV_tmp1(4))
+                                        if (abs(myV_tmp1(4)) < 1e-12) err5 = 0d0
+
+                                        if (myR_tmp1(4) /= myR_tmp1(4) .or. myV_tmp1(4) /= myV_tmp1(4)) then
+                                            print *, "NaN in bubbles routine @ t_step = ", t_step, j, k, l
+                                            print *, myRho, myP, alf, myR, myV
+                                            print *, (q_cons_vf(i)%sf(j, k, l), i = 1, sys_size)
+                                            print *, (q_prim_vf(i)%sf(j, k, l), i = 1, sys_size)
+                                            stop
+                                        end if 
+
+                                        ! Determine acceptance/rejection and update step size
+                                        !   Rule 1: err1, err2, err3 < tol
+                                        !   Rule 2: myR_tmp1(4) > 0d0
+                                        !   Rule 3: abs((myR_tmp1(4) - myR_tmp2(4))/myR) < tol
+                                        !   Rule 4: abs((myV_tmp1(4) - myV_tmp2(4))/myV) < tol
+                                        if ((err1 <= 1d-4) .and. (err2 <= 1d-4) .and. (err3 <= 1d-4) &
+                                            .and. (err4 < 1d-4) .and. (err5 < 1d-4) &
+                                            .and. myR_tmp1(4) > 0d0) then
+
+                                            ! Accepted. Finalize the sub-step
+                                            t_new = t_new + h
+
+                                            ! Update R and V
+                                            myR = myR_tmp1(4)
+                                            myV = myV_tmp1(4)
+
+                                            ! Update step size for the next sub-step
+                                            h = h*min(2d0, max(0.5d0, (1d-4/err1)**(1d0/3d0)))
+
+                                            exit
+                                        else
+                                            ! Rejected. Update step size for the next try on sub-step
+                                            if (err2 <= 1d-4) then
+                                                h = 0.5d0*h
+                                            else
+                                                h = 0.25d0*h
+                                            end if
+
+                                        end if
+                                    end do
+
+                                    ! Exit the loop if the final time reached dt
+                                    if (t_new == 0.5d0*dt) exit
+
                                 end do
 
-                                ! Exit the loop if the final time reached dt
-                                if (t_new == 0.5d0*dt) exit
+                                q_cons_vf(rs(q))%sf(j, k, l) = nbub*myR
+                                q_cons_vf(vs(q))%sf(j, k, l) = nbub*myV
 
-                            end do
-
-                            q_cons_vf(rs(q))%sf(j, k, l) = nbub*myR
-                            q_cons_vf(vs(q))%sf(j, k, l) = nbub*myV
-
-                        else
-                            rddot = f_rddot(myRho, myP, myR, myV, R0(q), &
-                                            pb, pbdot, alf, n_tait, B_tait, &
-                                            bub_adv_src(j, k, l), divu%sf(j, k, l))
-                            bub_v_src(j, k, l, q) = nbub*rddot
-                            bub_r_src(j, k, l, q) = q_cons_vf(vs(q))%sf(j, k, l)
-                        end if
-
-                        if (alf < 1.d-11) then
-                            bub_adv_src(j, k, l) = 0d0
-                            bub_r_src(j, k, l, q) = 0d0
-                            bub_v_src(j, k, l, q) = 0d0
-                            if (.not. polytropic) then
-                                bub_p_src(j, k, l, q) = 0d0
-                                bub_m_src(j, k, l, q) = 0d0
+                            else
+                                rddot = f_rddot(myRho, myP, myR, myV, R0(q), &
+                                                pb, pbdot, alf, n_tait, B_tait, &
+                                                bub_adv_src(j, k, l), divu%sf(j, k, l))
+                                bub_v_src(j, k, l, q) = nbub*rddot
+                                bub_r_src(j, k, l, q) = q_cons_vf(vs(q))%sf(j, k, l)
                             end if
-                        end if
-                    end do
+
+                            if (alf < 1.d-11) then
+                                bub_adv_src(j, k, l) = 0d0
+                                bub_r_src(j, k, l, q) = 0d0
+                                bub_v_src(j, k, l, q) = 0d0
+                                if (.not. polytropic) then
+                                    bub_p_src(j, k, l, q) = 0d0
+                                    bub_m_src(j, k, l, q) = 0d0
+                                end if
+                            end if
+                        end do
+                    end if
                 end do
             end do
         end do

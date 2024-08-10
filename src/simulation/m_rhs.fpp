@@ -1028,7 +1028,7 @@ contains
         end if
         call cpu_time(t_finish)
         if (t_step >= 4) then
-            time_avg = (abs(t_finish - t_start) + (t_step - 4)*time_avg)/(t_step - 3)
+            time_avg = (abs(t_finish - t_start)/((ix%end - ix%beg)*(iy%end - iy%beg)*(iz%end - iz%beg)) + (t_step - 4)*time_avg)/(t_step - 3)
         else
             time_avg = 0d0
         end if
@@ -1101,14 +1101,24 @@ contains
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m
-                            do i = 1, num_fluids
-                                rhs_vf(i + intxb - 1)%sf(j, k, l) = &
-                                    rhs_vf(i + intxb - 1)%sf(j, k, l) - 1d0/dx(j)* &
-                                    q_cons_vf%vf(i + advxb - 1)%sf(j, k, l)* &
+                            if (bubbles .and. num_fluids == 1) then
+                                rhs_vf(intxb)%sf(j, k, l) = &
+                                    rhs_vf(intxb)%sf(j, k, l) - 1d0/dx(j)* &
+                                    (1d0 - q_cons_vf%vf(alf_idx)%sf(j, k, l))* &
                                     q_prim_vf%vf(E_idx)%sf(j, k, l)* &
                                     (flux_src_n(1)%vf(advxb)%sf(j, k, l) - &
-                                     flux_src_n(1)%vf(advxb)%sf(j - 1, k, l))
-                            end do
+                                        flux_src_n(1)%vf(advxb)%sf(j - 1, k, l))
+                            else
+                                !$acc loop seq
+                                do i = 1, num_fluids
+                                    rhs_vf(i + intxb - 1)%sf(j, k, l) = &
+                                        rhs_vf(i + intxb - 1)%sf(j, k, l) - 1d0/dx(j)* &
+                                        q_cons_vf%vf(i + advxb - 1)%sf(j, k, l)* &
+                                        q_prim_vf%vf(E_idx)%sf(j, k, l)* &
+                                        (flux_src_n(1)%vf(advxb)%sf(j, k, l) - &
+                                            flux_src_n(1)%vf(advxb)%sf(j - 1, k, l))
+                                end do
+                            end if
                         end do
                     end do
                 end do
@@ -1207,18 +1217,28 @@ contains
             end do
 
             if (model_eqns == 3) then
-                !$acc parallel loop collapse(4) gang vector default(present)
+                !$acc parallel loop collapse(3) gang vector default(present)
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m
-                            do i = 1, num_fluids
-                                rhs_vf(i + intxb - 1)%sf(j, k, l) = &
-                                    rhs_vf(i + intxb - 1)%sf(j, k, l) - 1d0/dy(k)* &
-                                    q_cons_vf%vf(i + advxb - 1)%sf(j, k, l)* &
+                            if (bubbles .and. num_fluids == 1) then
+                                rhs_vf(intxb)%sf(j, k, l) = &
+                                    rhs_vf(intxb)%sf(j, k, l) - 1d0/dy(k)* &
+                                    (1d0 - q_cons_vf%vf(alf_idx)%sf(j, k, l))* &
                                     q_prim_vf%vf(E_idx)%sf(j, k, l)* &
                                     (flux_src_n(2)%vf(advxb)%sf(j, k, l) - &
-                                     flux_src_n(2)%vf(advxb)%sf(j, k - 1, l))
-                            end do
+                                    flux_src_n(2)%vf(advxb)%sf(j, k - 1, l))
+                            else
+                                !$acc loop seq
+                                do i = 1, num_fluids
+                                    rhs_vf(i + intxb - 1)%sf(j, k, l) = &
+                                        rhs_vf(i + intxb - 1)%sf(j, k, l) - 1d0/dy(k)* &
+                                        q_cons_vf%vf(i + advxb - 1)%sf(j, k, l)* &
+                                        q_prim_vf%vf(E_idx)%sf(j, k, l)* &
+                                        (flux_src_n(2)%vf(advxb)%sf(j, k, l) - &
+                                        flux_src_n(2)%vf(advxb)%sf(j, k - 1, l))
+                                end do
+                            end if
                         end do
                     end do
                 end do
@@ -1228,14 +1248,23 @@ contains
                     do l = 0, p
                         do k = 0, n
                             do j = 0, m
-                                do i = 1, num_fluids
-                                    rhs_vf(i + intxb - 1)%sf(j, k, l) = &
-                                        rhs_vf(i + intxb - 1)%sf(j, k, l) - 5d-1/y_cc(k)* &
-                                        q_cons_vf%vf(i + advxb - 1)%sf(j, k, l)* &
+                                if (bubbles .and. num_fluids == 1) then
+                                    rhs_vf(intxb)%sf(j, k, l) = &
+                                        rhs_vf(intxb)%sf(j, k, l) - 5d-1/y_cc(k)* &
+                                        (1d0 - q_cons_vf%vf(alf_idx)%sf(j, k, l))* &
                                         q_prim_vf%vf(E_idx)%sf(j, k, l)* &
                                         (flux_src_n(2)%vf(advxb)%sf(j, k, l) + &
-                                         flux_src_n(2)%vf(advxb)%sf(j, k - 1, l))
-                                end do
+                                            flux_src_n(2)%vf(advxb)%sf(j, k - 1, l))
+                                else
+                                    do i = 1, num_fluids
+                                        rhs_vf(i + intxb - 1)%sf(j, k, l) = &
+                                            rhs_vf(i + intxb - 1)%sf(j, k, l) - 5d-1/y_cc(k)* &
+                                            q_cons_vf%vf(i + advxb - 1)%sf(j, k, l)* &
+                                            q_prim_vf%vf(E_idx)%sf(j, k, l)* &
+                                            (flux_src_n(2)%vf(advxb)%sf(j, k, l) + &
+                                                flux_src_n(2)%vf(advxb)%sf(j, k - 1, l))
+                                    end do
+                                end if
                             end do
                         end do
                     end do
@@ -1413,18 +1442,28 @@ contains
             end if
 
             if (model_eqns == 3) then
-                !$acc parallel loop collapse(4) gang vector default(present)
+                !$acc parallel loop collapse(3) gang vector default(present)
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m
-                            do i = 1, num_fluids
-                                rhs_vf(i + intxb - 1)%sf(j, k, l) = &
-                                    rhs_vf(i + intxb - 1)%sf(j, k, l) - 1d0/dz(l)* &
-                                    q_cons_vf%vf(i + advxb - 1)%sf(j, k, l)* &
+                            if (bubbles .and. num_fluids == 1) then
+                                rhs_vf(intxb)%sf(j, k, l) = &
+                                    rhs_vf(intxb)%sf(j, k, l) - 1d0/dz(l)* &
+                                    (1d0 - q_cons_vf%vf(alf_idx)%sf(j, k, l))* &
                                     q_prim_vf%vf(E_idx)%sf(j, k, l)* &
                                     (flux_src_n(3)%vf(advxb)%sf(j, k, l) - &
-                                     flux_src_n(3)%vf(advxb)%sf(j, k, l - 1))
-                            end do
+                                    flux_src_n(3)%vf(advxb)%sf(j, k, l - 1))
+                            else
+                                !$acc loop seq
+                                do i = 1, num_fluids
+                                    rhs_vf(i + intxb - 1)%sf(j, k, l) = &
+                                        rhs_vf(i + intxb - 1)%sf(j, k, l) - 1d0/dz(l)* &
+                                        q_cons_vf%vf(i + advxb - 1)%sf(j, k, l)* &
+                                        q_prim_vf%vf(E_idx)%sf(j, k, l)* &
+                                        (flux_src_n(3)%vf(advxb)%sf(j, k, l) - &
+                                        flux_src_n(3)%vf(advxb)%sf(j, k, l - 1))
+                                end do
+                            end if
                         end do
                     end do
                 end do
@@ -1893,113 +1932,113 @@ contains
                     ! Is the pressure relaxation procedure necessary?
                     relax = 1
 
-                    !$acc loop seq
-                    do i = 1, num_fluids
-                        if (q_cons_vf(i + advxb - 1)%sf(j, k, l) > (1d0 - sgm_eps)) relax = 0
-                    end do
+                    if (bubbles .and. num_fluids > 1) then
+                        !$acc loop seq
+                        do i = 1, num_fluids - 1
+                            if (q_cons_vf(i + advxb - 1)%sf(j, k, l) > (1d0 - sgm_eps)) relax = 0
+                        end do
 
-                    if (relax == 1) then
-                        ! Initial state
-                        pres_relax = 0d0
+                        if (relax == 1) then
+                            ! Initial state
+                            pres_relax = 0d0
+
+                            !$acc loop seq
+                            do i = 1, num_fluids - 1
+                                if (q_cons_vf(i + advxb - 1)%sf(j, k, l) > sgm_eps) then
+                                    pres_K_init(i) = &
+                                        (q_cons_vf(i + intxb - 1)%sf(j, k, l)/ &
+                                        q_cons_vf(i + advxb - 1)%sf(j, k, l) &
+                                        - pi_infs(i))/gammas(i)
+
+                                    if (pres_K_init(i) <= -(1d0 - 1d-8)*pres_inf(i) + 1d-8) &
+                                        pres_K_init(i) = -(1d0 - 1d-8)*pres_inf(i) + 1d-8
+                                else
+                                    pres_K_init(i) = 0d0
+                                end if
+                                pres_relax = pres_relax + q_cons_vf(i + advxb - 1)%sf(j, k, l)*pres_K_init(i)
+                            end do
+
+                            ! Iterative process for relaxed pressure determination
+                            f_pres = 1d-9
+                            df_pres = 1d9
+
+                            !$acc loop seq
+                            do i = 1, num_fluids
+                                rho_K_s(i) = 0d0
+                            end do
+
+                            !$acc loop seq
+                            do iter = 0, 49
+
+                                if (DABS(f_pres) > 1d-10) then
+                                    pres_relax = pres_relax - f_pres/df_pres
+
+                                    ! Physical pressure
+                                    do i = 1, num_fluids - 1
+                                        if (pres_relax <= -(1d0 - 1d-8)*pres_inf(i) + 1d-8) &
+                                            pres_relax = -(1d0 - 1d-8)*pres_inf(i) + 1d0
+                                    end do
+
+                                    ! Newton-Raphson method
+                                    f_pres = -1d0 + q_cons_vf(alf_idx)%sf(j, k, l)
+                                    df_pres = 0d0
+
+                                    !$acc loop seq
+                                    do i = 1, num_fluids - 1
+                                        if (q_cons_vf(i + advxb - 1)%sf(j, k, l) > sgm_eps) then
+                                            rho_K_s(i) = q_cons_vf(i + contxb - 1)%sf(j, k, l)/ &
+                                                        max(q_cons_vf(i + advxb - 1)%sf(j, k, l), sgm_eps) &
+                                                        *((pres_relax + pres_inf(i))/(pres_K_init(i) + &
+                                                                                    pres_inf(i)))**(1d0/gamma_min(i))
+
+                                            f_pres = f_pres + q_cons_vf(i + contxb - 1)%sf(j, k, l) &
+                                                    /rho_K_s(i)
+
+                                            df_pres = df_pres - q_cons_vf(i + contxb - 1)%sf(j, k, l) &
+                                                    /(gamma_min(i)*rho_K_s(i)*(pres_relax + pres_inf(i)))
+                                        end if
+                                    end do
+                                end if
+
+                            end do
+
+                            ! Cell update of the volume fraction
+                            !$acc loop seq
+                            do i = 1, num_fluids - 1
+                                if (q_cons_vf(i + advxb - 1)%sf(j, k, l) > sgm_eps) &
+                                    q_cons_vf(i + advxb - 1)%sf(j, k, l) = q_cons_vf(i + contxb - 1)%sf(j, k, l) &
+                                                                        /rho_K_s(i)
+                            end do
+                        end if
+
+                        ! ==================================================================
+
+                        ! Mixture-total-energy correction ==================================
+
+                        ! The mixture-total-energy correction of the mixture pressure P is not necessary here
+                        ! because the primitive variables are directly recovered later on by the conservative
+                        ! variables (see s_convert_conservative_to_primitive_variables called in s_compute_rhs).
+                        ! However, the internal-energy equations should be reset with the corresponding mixture
+                        ! pressure from the correction. This step is carried out below.
 
                         !$acc loop seq
                         do i = 1, num_fluids
-                            if (q_cons_vf(i + advxb - 1)%sf(j, k, l) > sgm_eps) then
-                                pres_K_init(i) = &
-                                    (q_cons_vf(i + intxb - 1)%sf(j, k, l)/ &
-                                     q_cons_vf(i + advxb - 1)%sf(j, k, l) &
-                                     - pi_infs(i))/gammas(i)
-
-                                if (pres_K_init(i) <= -(1d0 - 1d-8)*pres_inf(i) + 1d-8) &
-                                    pres_K_init(i) = -(1d0 - 1d-8)*pres_inf(i) + 1d-8
-                            else
-                                pres_K_init(i) = 0d0
-                            end if
-                            pres_relax = pres_relax + q_cons_vf(i + advxb - 1)%sf(j, k, l)*pres_K_init(i)
+                            alpha_rho(i) = q_cons_vf(i)%sf(j, k, l)
+                            alpha(i) = q_cons_vf(E_idx + i)%sf(j, k, l)
                         end do
 
-                        ! Iterative process for relaxed pressure determination
-                        f_pres = 1d-9
-                        df_pres = 1d9
-
-                        !$acc loop seq
-                        do i = 1, num_fluids
-                            rho_K_s(i) = 0d0
-                        end do
-
-                        !$acc loop seq
-                        do iter = 0, 49
-
-                            if (DABS(f_pres) > 1d-10) then
-                                pres_relax = pres_relax - f_pres/df_pres
-
-                                ! Physical pressure
-                                do i = 1, num_fluids
-                                    if (pres_relax <= -(1d0 - 1d-8)*pres_inf(i) + 1d-8) &
-                                        pres_relax = -(1d0 - 1d-8)*pres_inf(i) + 1d0
-                                end do
-
-                                ! Newton-Raphson method
-                                f_pres = -1d0
-                                df_pres = 0d0
-
-                                !$acc loop seq
-                                do i = 1, num_fluids
-                                    if (q_cons_vf(i + advxb - 1)%sf(j, k, l) > sgm_eps) then
-                                        rho_K_s(i) = q_cons_vf(i + contxb - 1)%sf(j, k, l)/ &
-                                                     max(q_cons_vf(i + advxb - 1)%sf(j, k, l), sgm_eps) &
-                                                     *((pres_relax + pres_inf(i))/(pres_K_init(i) + &
-                                                                                   pres_inf(i)))**(1d0/gamma_min(i))
-
-                                        f_pres = f_pres + q_cons_vf(i + contxb - 1)%sf(j, k, l) &
-                                                 /rho_K_s(i)
-
-                                        df_pres = df_pres - q_cons_vf(i + contxb - 1)%sf(j, k, l) &
-                                                  /(gamma_min(i)*rho_K_s(i)*(pres_relax + pres_inf(i)))
-                                    end if
-                                end do
-                            end if
-
-                        end do
-
-                        ! Cell update of the volume fraction
-                        !$acc loop seq
-                        do i = 1, num_fluids
-                            if (q_cons_vf(i + advxb - 1)%sf(j, k, l) > sgm_eps) &
-                                q_cons_vf(i + advxb - 1)%sf(j, k, l) = q_cons_vf(i + contxb - 1)%sf(j, k, l) &
-                                                                       /rho_K_s(i)
-                        end do
-                    end if
-
-                    ! ==================================================================
-
-                    ! Mixture-total-energy correction ==================================
-
-                    ! The mixture-total-energy correction of the mixture pressure P is not necessary here
-                    ! because the primitive variables are directly recovered later on by the conservative
-                    ! variables (see s_convert_conservative_to_primitive_variables called in s_compute_rhs).
-                    ! However, the internal-energy equations should be reset with the corresponding mixture
-                    ! pressure from the correction. This step is carried out below.
-
-                    !$acc loop seq
-                    do i = 1, num_fluids
-                        alpha_rho(i) = q_cons_vf(i)%sf(j, k, l)
-                        alpha(i) = q_cons_vf(E_idx + i)%sf(j, k, l)
-                    end do
-
-                    if (bubbles) then
                         rho = 0d0
                         gamma = 0d0
                         pi_inf = 0d0
 
-                        if (mpp_lim .and. (model_eqns == 2) .and. (num_fluids > 2)) then
+                        if (mpp_lim .and. (model_eqns == 2 .or. model_eqns == 3) .and. (num_fluids > 2)) then
                             !$acc loop seq
                             do i = 1, num_fluids
                                 rho = rho + alpha_rho(i)
                                 gamma = gamma + alpha(i)*gammas(i)
                                 pi_inf = pi_inf + alpha(i)*pi_infs(i)
                             end do
-                        else if ((model_eqns == 2) .and. (num_fluids > 2)) then
+                        else if ((model_eqns == 2 .or. model_eqns == 3) .and. (num_fluids > 2)) then
                             !$acc loop seq
                             do i = 1, num_fluids - 1
                                 rho = rho + alpha_rho(i)
@@ -2011,67 +2050,207 @@ contains
                             gamma = gammas(1)
                             pi_inf = pi_infs(1)
                         end if
+
+                        dyn_pres = 0d0
+
+                        !$acc loop seq
+                        do i = momxb, momxe
+                            dyn_pres = dyn_pres + 5d-1*q_cons_vf(i)%sf(j, k, l)* &
+                                    q_cons_vf(i)%sf(j, k, l)/max(rho, sgm_eps)
+                        end do
+
+                        pres_relax = ((q_cons_vf(E_idx)%sf(j, k, l) - dyn_pres)/(1d0 - q_cons_vf(alf_idx)%sf(j, k, l)) - pi_inf)/gamma
+
+                        !$acc loop seq
+                        do i = 1, num_fluids - 1
+                            q_cons_vf(i + intxb - 1)%sf(j, k, l) = &
+                                q_cons_vf(i + advxb - 1)%sf(j, k, l)* &
+                                (gammas(i)*pres_relax + pi_infs(i))
+                        end do
+                        ! ==================================================================
+
                     else
-                        rho = 0d0
-                        gamma = 0d0
-                        pi_inf = 0d0
+                        !$acc loop seq
+                        do i = 1, num_fluids
+                            if (q_cons_vf(i + advxb - 1)%sf(j, k, l) > (1d0 - sgm_eps)) relax = 0
+                        end do
 
-                        sum_alpha = 0d0
+                        if (relax == 1) then
+                            ! Initial state
+                            pres_relax = 0d0
 
-                        if (mpp_lim) then
                             !$acc loop seq
                             do i = 1, num_fluids
-                                alpha_rho(i) = max(0d0, alpha_rho(i))
-                                alpha(i) = min(max(0d0, alpha(i)), 1d0)
-                                sum_alpha = sum_alpha + alpha(i)
+                                if (q_cons_vf(i + advxb - 1)%sf(j, k, l) > sgm_eps) then
+                                    pres_K_init(i) = &
+                                        (q_cons_vf(i + intxb - 1)%sf(j, k, l)/ &
+                                        q_cons_vf(i + advxb - 1)%sf(j, k, l) &
+                                        - pi_infs(i))/gammas(i)
+
+                                    if (pres_K_init(i) <= -(1d0 - 1d-8)*pres_inf(i) + 1d-8) &
+                                        pres_K_init(i) = -(1d0 - 1d-8)*pres_inf(i) + 1d-8
+                                else
+                                    pres_K_init(i) = 0d0
+                                end if
+                                pres_relax = pres_relax + q_cons_vf(i + advxb - 1)%sf(j, k, l)*pres_K_init(i)
                             end do
 
-                            alpha = alpha/max(sum_alpha, sgm_eps)
+                            ! Iterative process for relaxed pressure determination
+                            f_pres = 1d-9
+                            df_pres = 1d9
 
+                            !$acc loop seq
+                            do i = 1, num_fluids
+                                rho_K_s(i) = 0d0
+                            end do
+
+                            !$acc loop seq
+                            do iter = 0, 49
+
+                                if (DABS(f_pres) > 1d-10) then
+                                    pres_relax = pres_relax - f_pres/df_pres
+
+                                    ! Physical pressure
+                                    do i = 1, num_fluids
+                                        if (pres_relax <= -(1d0 - 1d-8)*pres_inf(i) + 1d-8) &
+                                            pres_relax = -(1d0 - 1d-8)*pres_inf(i) + 1d0
+                                    end do
+
+                                    ! Newton-Raphson method
+                                    f_pres = -1d0
+                                    df_pres = 0d0
+
+                                    !$acc loop seq
+                                    do i = 1, num_fluids
+                                        if (q_cons_vf(i + advxb - 1)%sf(j, k, l) > sgm_eps) then
+                                            rho_K_s(i) = q_cons_vf(i + contxb - 1)%sf(j, k, l)/ &
+                                                        max(q_cons_vf(i + advxb - 1)%sf(j, k, l), sgm_eps) &
+                                                        *((pres_relax + pres_inf(i))/(pres_K_init(i) + &
+                                                                                    pres_inf(i)))**(1d0/gamma_min(i))
+
+                                            f_pres = f_pres + q_cons_vf(i + contxb - 1)%sf(j, k, l) &
+                                                    /rho_K_s(i)
+
+                                            df_pres = df_pres - q_cons_vf(i + contxb - 1)%sf(j, k, l) &
+                                                    /(gamma_min(i)*rho_K_s(i)*(pres_relax + pres_inf(i)))
+                                        end if
+                                    end do
+                                end if
+
+                            end do
+
+                            ! Cell update of the volume fraction
+                            !$acc loop seq
+                            do i = 1, num_fluids
+                                if (q_cons_vf(i + advxb - 1)%sf(j, k, l) > sgm_eps) &
+                                    q_cons_vf(i + advxb - 1)%sf(j, k, l) = q_cons_vf(i + contxb - 1)%sf(j, k, l) &
+                                                                        /rho_K_s(i)
+                            end do
                         end if
+
+                        ! ==================================================================
+
+                        ! Mixture-total-energy correction ==================================
+
+                        ! The mixture-total-energy correction of the mixture pressure P is not necessary here
+                        ! because the primitive variables are directly recovered later on by the conservative
+                        ! variables (see s_convert_conservative_to_primitive_variables called in s_compute_rhs).
+                        ! However, the internal-energy equations should be reset with the corresponding mixture
+                        ! pressure from the correction. This step is carried out below.
 
                         !$acc loop seq
                         do i = 1, num_fluids
-                            rho = rho + alpha_rho(i)
-                            gamma = gamma + alpha(i)*gammas(i)
-                            pi_inf = pi_inf + alpha(i)*pi_infs(i)
+                            alpha_rho(i) = q_cons_vf(i)%sf(j, k, l)
+                            alpha(i) = q_cons_vf(E_idx + i)%sf(j, k, l)
                         end do
 
-                        if (any(Re_size > 0)) then
-                            !$acc loop seq
-                            do i = 1, 2
-                                Re(i) = dflt_real
+                        if (bubbles) then
+                            rho = 0d0
+                            gamma = 0d0
+                            pi_inf = 0d0
 
-                                if (Re_size(i) > 0) Re(i) = 0d0
+                            if (mpp_lim .and. (model_eqns == 2 .or. model_eqns == 3) .and. (num_fluids > 2)) then
                                 !$acc loop seq
-                                do q = 1, Re_size(i)
-                                    Re(i) = alpha(Re_idx(i, q))/Res(i, q) &
-                                            + Re(i)
+                                do i = 1, num_fluids
+                                    rho = rho + alpha_rho(i)
+                                    gamma = gamma + alpha(i)*gammas(i)
+                                    pi_inf = pi_inf + alpha(i)*pi_infs(i)
+                                end do
+                            else if ((model_eqns == 2 .or. model_eqns == 3) .and. (num_fluids > 2)) then
+                                !$acc loop seq
+                                do i = 1, num_fluids - 1
+                                    rho = rho + alpha_rho(i)
+                                    gamma = gamma + alpha(i)*gammas(i)
+                                    pi_inf = pi_inf + alpha(i)*pi_infs(i)
+                                end do
+                            else
+                                rho = alpha_rho(1)
+                                gamma = gammas(1)
+                                pi_inf = pi_infs(1)
+                            end if
+                        else
+                            rho = 0d0
+                            gamma = 0d0
+                            pi_inf = 0d0
+
+                            sum_alpha = 0d0
+
+                            if (mpp_lim) then
+                                !$acc loop seq
+                                do i = 1, num_fluids
+                                    alpha_rho(i) = max(0d0, alpha_rho(i))
+                                    alpha(i) = min(max(0d0, alpha(i)), 1d0)
+                                    sum_alpha = sum_alpha + alpha(i)
                                 end do
 
-                                Re(i) = 1d0/max(Re(i), sgm_eps)
+                                alpha = alpha/max(sum_alpha, sgm_eps)
 
+                            end if
+
+                            !$acc loop seq
+                            do i = 1, num_fluids
+                                rho = rho + alpha_rho(i)
+                                gamma = gamma + alpha(i)*gammas(i)
+                                pi_inf = pi_inf + alpha(i)*pi_infs(i)
                             end do
+
+                            if (any(Re_size > 0)) then
+                                !$acc loop seq
+                                do i = 1, 2
+                                    Re(i) = dflt_real
+
+                                    if (Re_size(i) > 0) Re(i) = 0d0
+                                    !$acc loop seq
+                                    do q = 1, Re_size(i)
+                                        Re(i) = alpha(Re_idx(i, q))/Res(i, q) &
+                                                + Re(i)
+                                    end do
+
+                                    Re(i) = 1d0/max(Re(i), sgm_eps)
+
+                                end do
+                            end if
                         end if
+
+                        dyn_pres = 0d0
+
+                        !$acc loop seq
+                        do i = momxb, momxe
+                            dyn_pres = dyn_pres + 5d-1*q_cons_vf(i)%sf(j, k, l)* &
+                                    q_cons_vf(i)%sf(j, k, l)/max(rho, sgm_eps)
+                        end do
+
+                        pres_relax = (q_cons_vf(E_idx)%sf(j, k, l) - dyn_pres - pi_inf)/gamma
+
+                        !$acc loop seq
+                        do i = 1, num_fluids
+                            q_cons_vf(i + intxb - 1)%sf(j, k, l) = &
+                                q_cons_vf(i + advxb - 1)%sf(j, k, l)* &
+                                (gammas(i)*pres_relax + pi_infs(i))
+                        end do
+                        ! ==================================================================
+
                     end if
-
-                    dyn_pres = 0d0
-
-                    !$acc loop seq
-                    do i = momxb, momxe
-                        dyn_pres = dyn_pres + 5d-1*q_cons_vf(i)%sf(j, k, l)* &
-                                   q_cons_vf(i)%sf(j, k, l)/max(rho, sgm_eps)
-                    end do
-
-                    pres_relax = (q_cons_vf(E_idx)%sf(j, k, l) - dyn_pres - pi_inf)/gamma
-
-                    !$acc loop seq
-                    do i = 1, num_fluids
-                        q_cons_vf(i + intxb - 1)%sf(j, k, l) = &
-                            q_cons_vf(i + advxb - 1)%sf(j, k, l)* &
-                            (gammas(i)*pres_relax + pi_infs(i))
-                    end do
-                    ! ==================================================================
                 end do
             end do
         end do
