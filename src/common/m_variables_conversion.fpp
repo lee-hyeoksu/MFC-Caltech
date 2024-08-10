@@ -281,7 +281,7 @@ contains
             gamma = fluid_pp(1)%gamma    !qK_vf(gamma_idx)%sf(i,j,k)
             pi_inf = fluid_pp(1)%pi_inf   !qK_vf(pi_inf_idx)%sf(i,j,k)
             qv = fluid_pp(1)%qv
-        else if ((model_eqns == 2) .and. bubbles) then
+        else if ((model_eqns == 2 .or. model_eqns == 3) .and. bubbles) then
             rho = 0d0; gamma = 0d0; pi_inf = 0d0; qv = 0d0
 
             if (mpp_lim .and. (num_fluids > 2)) then
@@ -552,14 +552,14 @@ contains
         pi_inf_K = 0d0
         qv_K = 0d0
 
-        if (mpp_lim .and. (model_eqns == 2) .and. (num_fluids > 2)) then
+        if (mpp_lim .and. (model_eqns == 2 .or. model_eqns == 3) .and. (num_fluids > 2)) then
             do i = 1, num_fluids
                 rho_K = rho_K + alpha_rho_K(i)
                 gamma_K = gamma_K + alpha_K(i)*gammas(i)
                 pi_inf_K = pi_inf_K + alpha_K(i)*pi_infs(i)
                 qv_K = qv_K + alpha_rho_K(i)*qvs(i)
             end do
-        else if ((model_eqns == 2) .and. (num_fluids > 2)) then
+        else if ((model_eqns == 2 .or. model_eqns == 3) .and. (num_fluids > 2)) then
             do i = 1, num_fluids - 1
                 rho_K = rho_K + alpha_rho_K(i)
                 gamma_K = gamma_K + alpha_K(i)*gammas(i)
@@ -1102,14 +1102,22 @@ contains
 
                     ! Computing the internal energies from the pressure and continuities
                     if (model_eqns == 3) then
-                        do i = 1, num_fluids
-                            ! internal energy calculation for each of the fluids
-                            q_cons_vf(i + internalEnergies_idx%beg - 1)%sf(j, k, l) = &
-                                q_cons_vf(i + adv_idx%beg - 1)%sf(j, k, l)* &
-                                (fluid_pp(i)%gamma*q_prim_vf(E_idx)%sf(j, k, l) + &
-                                 fluid_pp(i)%pi_inf) + &
-                                q_cons_vf(i + cont_idx%beg - 1)%sf(j, k, l)*fluid_pp(i)%qv
-                        end do
+                        if (bubbles .and. num_fluids == 1) then
+                            q_cons_vf(internalEnergies_idx%beg)%sf(j, k, l) = &
+                                    (1d0 - q_cons_vf(alf_idx)%sf(j, k, l))* &
+                                    (fluid_pp(1)%gamma*q_prim_vf(E_idx)%sf(j, k, l) + &
+                                    fluid_pp(1)%pi_inf) + &
+                                    q_cons_vf(cont_idx%beg)%sf(j, k, l)*fluid_pp(1)%qv
+                        else
+                            do i = 1, num_fluids
+                                ! internal energy calculation for each of the fluids
+                                q_cons_vf(i + internalEnergies_idx%beg - 1)%sf(j, k, l) = &
+                                    q_cons_vf(i + adv_idx%beg - 1)%sf(j, k, l)* &
+                                    (fluid_pp(i)%gamma*q_prim_vf(E_idx)%sf(j, k, l) + &
+                                    fluid_pp(i)%pi_inf) + &
+                                    q_cons_vf(i + cont_idx%beg - 1)%sf(j, k, l)*fluid_pp(i)%qv
+                            end do
+                        end if
                     end if
 
                     if (bubbles) then

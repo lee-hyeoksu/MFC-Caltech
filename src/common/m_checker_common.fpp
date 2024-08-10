@@ -117,9 +117,9 @@ contains
         elseif (thermal > 3) then
             call s_mpi_abort('thermal must be less than 4 if using bubbles. '// &
                              'Exiting ...')
-        elseif (model_eqns == 3) then
-            call s_mpi_abort('Bubble models untested with '// &
-                             '6-equation model (model_eqns = 3). Exiting ...')
+        ! elseif (model_eqns == 3) then
+        !     call s_mpi_abort('Bubble models untested with '// &
+        !                      '6-equation model (model_eqns = 3). Exiting ...')
         elseif (model_eqns == 1) then
             call s_mpi_abort('Bubble models untested with '// &
                              'pi-gamma model (model_eqns = 1). Exiting ...')
@@ -161,9 +161,9 @@ contains
         if (.not. bubbles) then
             call s_mpi_abort('adv_n requires bubbles = true.'// &
                              'Exiting ...')
-        else if (num_fluids > 1) then
-            call s_mpi_abort('adv_n requires num_fluids = 1. '// &
-                             'Exiting ...')
+        ! else if (num_fluids > 1) then
+        !     call s_mpi_abort('adv_n requires num_fluids = 1. '// &
+        !                      'Exiting ...')
         else if (qbmm) then
             call s_mpi_abort('adv_n is incompatible with qbmm.'// &
                              'Exiting ...')
@@ -263,6 +263,9 @@ contains
         elseif (model_eqns == 3 .and. num_fluids == dflt_int) then
             call s_mpi_abort('6-equation model (model_eqns = 3) '// &
                              'requires num_fluids to be set. Exiting ...')
+        elseif (model_eqns == 1 .and. adv_alphan) then
+            call s_mpi_abort('adv_alphan is not supported for '// &
+                             'model_eqns = 1. Exiting ...')
         elseif (model_eqns == 1 .and. mpp_lim) then
             call s_mpi_abort('mpp_lim is not supported for '// &
                              'model_eqns = 1. Exiting ...')
