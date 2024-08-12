@@ -313,7 +313,6 @@ contains
                             n_tait = 1.d0/n_tait + 1.d0 !make this the usual little 'gamma'
                             B_tait = B_tait*(n_tait - 1)/n_tait ! make this the usual pi_inf
 
-                            ! myRho = q_prim_vf(1)%sf(j, k, l)
                             myP = q_prim_vf(E_idx)%sf(j, k, l)
                             alf = q_prim_vf(alf_idx)%sf(j, k, l)
                             myR = q_prim_vf(rs(q))%sf(j, k, l)
@@ -445,8 +444,14 @@ contains
                 do q = 0, n
                     do i = 0, m
                         rhs_vf(alf_idx)%sf(i, q, l) = rhs_vf(alf_idx)%sf(i, q, l) + bub_adv_src(i, q, l)
-                        if (num_fluids > 1) rhs_vf(advxb)%sf(i, q, l) = &
-                            rhs_vf(advxb)%sf(i, q, l) - bub_adv_src(i, q, l)
+                        if (num_fluids > 1) then
+                            !$acc loop seq
+                            do j = 1, num_fluids - 1
+                                rhs_vf(advxb + j - 1)%sf(i, q, l) = rhs_vf(advxb)%sf(i, q, l) &
+                                                        - q_prim_vf(advxb + j - 1)%sf(i, q, l)*bub_adv_src(i, q, l) &
+                                                        / (1d0 - q_prim_vf(alf_idx)%sf(i, q, l))
+                            end do
+                        end if
                         !$acc loop seq
                         do k = 1, nb
                             rhs_vf(rs(k))%sf(i, q, l) = rhs_vf(rs(k))%sf(i, q, l) + bub_r_src(i, q, l, k)
