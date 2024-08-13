@@ -515,7 +515,86 @@ contains
             internalEnergies_idx%beg = adv_idx%end + 1
             internalEnergies_idx%end = adv_idx%end + num_fluids
             sys_size = internalEnergies_idx%end
-            alf_idx = 1 ! dummy, cannot actually have a void fraction
+
+            if (bubbles) then
+                alf_idx = adv_idx%end
+            else
+                alf_idx = 1
+            end if
+
+            if (qbmm) then
+                nmom = 6
+            end if
+
+            if (bubbles) then
+
+                bub_idx%beg = sys_size + 1
+                if (qbmm) then
+                    bub_idx%end = adv_idx%end + nb*nmom
+                else
+                    if (.not. polytropic) then
+                        bub_idx%end = sys_size + 4*nb
+                    else
+                        bub_idx%end = sys_size + 2*nb
+                    end if
+                end if
+                sys_size = bub_idx%end
+
+                if (adv_n) then
+                    n_idx = bub_idx%end + 1
+                    sys_size = n_idx
+                end if
+
+                allocate (bub_idx%rs(nb), bub_idx%vs(nb))
+                allocate (bub_idx%ps(nb), bub_idx%ms(nb))
+                allocate (weight(nb), R0(nb), V0(nb))
+
+                if (qbmm) then
+                    allocate (bub_idx%moms(nb, nmom))
+                    do i = 1, nb
+                        do j = 1, nmom
+                            bub_idx%moms(i, j) = bub_idx%beg + (j - 1) + (i - 1)*nmom
+                        end do
+                        bub_idx%rs(i) = bub_idx%moms(i, 2)
+                        bub_idx%vs(i) = bub_idx%moms(i, 3)
+                    end do
+                else
+                    do i = 1, nb
+                        if (polytropic .neqv. .true.) then
+                            fac = 4
+                        else
+                            fac = 2
+                        end if
+
+                        bub_idx%rs(i) = bub_idx%beg + (i - 1)*fac
+                        bub_idx%vs(i) = bub_idx%rs(i) + 1
+
+                        if (polytropic .neqv. .true.) then
+                            bub_idx%ps(i) = bub_idx%vs(i) + 1
+                            bub_idx%ms(i) = bub_idx%ps(i) + 1
+                        end if
+                    end do
+                end if
+
+                if (nb == 1) then
+                    weight(:) = 1d0
+                    R0(:) = 1d0
+                    V0(:) = 0d0
+                else if (nb > 1) then
+                    !call s_simpson
+                    V0(:) = 0d0
+                else
+                    stop 'Invalid value of nb'
+                end if
+
+                if (polytropic .neqv. .true.) then
+                    !call s_initialize_nonpoly
+                else
+                    rhoref = 1.d0
+                    pref = 1.d0
+                end if
+
+            end if
 
             if (.not. f_is_default(sigma)) then
                 c_idx = sys_size + 1
