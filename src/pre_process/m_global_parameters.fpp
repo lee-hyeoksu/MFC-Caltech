@@ -110,6 +110,7 @@ module m_global_parameters
     logical :: mixlayer_perturb !< Superimpose instability waves to surrounding fluid flow
 
     real(kind(0d0)) :: pi_fac !< Factor for artificial pi_inf
+    logical :: coupling !<
 
     ! Perturb density of surrounding air so as to break symmetry of grid
     logical :: perturb_flow
@@ -390,8 +391,13 @@ contains
 
         ! surface tension modeling
         sigma = dflt_real
+
+        ! Artificial Mach number
         pi_fac = 1d0
 
+        ! Coupling
+        coupling = .true.
+        
         ! Immersed Boundaries
         ib = .false.
         num_ibs = dflt_int

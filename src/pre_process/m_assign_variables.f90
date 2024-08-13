@@ -421,6 +421,12 @@ contains
                     R3bar = R3bar + weight(i)*(q_prim_vf(bub_idx%rs(i))%sf(j, k, l))**3d0
                 end do
                 q_prim_vf(n_idx)%sf(j, k, l) = 3*q_prim_vf(alf_idx)%sf(j, k, l)/(4*pi*R3bar)
+
+                if (coupling) then
+                    q_prim_vf(n_idx)%sf(j, k, l) = 3d0*q_prim_vf(alf_idx)%sf(j, k, l)/(4d0*pi*R3bar)
+                else
+                    q_prim_vf(n_idx)%sf(j, k, l) = 3d0*1d-5/(4d0*pi*R3bar)
+                end if
             end if
         end if
 
@@ -562,6 +568,12 @@ contains
                     R3bar = R3bar + weight(i)*(q_prim_vf(bub_idx%rs(i))%sf(j, k, l))**3d0
                 end do
                 q_prim_vf(n_idx)%sf(j, k, l) = 3*q_prim_vf(alf_idx)%sf(j, k, l)/(4*pi*R3bar)
+
+                if (coupling) then
+                    q_prim_vf(n_idx)%sf(j, k, l) = 3d0*q_prim_vf(alf_idx)%sf(j, k, l)/(4d0*pi*R3bar)
+                else
+                    q_prim_vf(n_idx)%sf(j, k, l) = 3d0*1d-5/(4d0*pi*R3bar)
+                end if
             end if
         end if
 
