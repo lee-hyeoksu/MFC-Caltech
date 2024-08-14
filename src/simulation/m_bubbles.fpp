@@ -564,8 +564,10 @@ contains
         ! Estimate error
         err_R = (-5d0*h/24d0)*(myV_tmp(2) + myV_tmp(3) - 2d0*myV_tmp(4)) &
                 /max(abs(myR_tmp(1)), abs(myR_tmp(4)))
+        if (max(abs(myR_tmp(1)), abs(myR_tmp(4))) < 1d-12) err_R = 0d0
         err_V = (-5d0*h/24d0)*(myA_tmp(2) + myA_tmp(3) - 2d0*myA_tmp(4)) &
                 /max(abs(myV_tmp(1)), abs(myV_tmp(4)))
+        if (max(abs(myV_tmp(1)), abs(myV_tmp(4))) < 1d-12) err_V = 0d0
         err = DSQRT((err_R**2d0 + err_V**2d0)/2d0)
 
     end subroutine s_advance_substep

@@ -54,6 +54,10 @@ program p_main
     end if
     finaltime = t_step_stop*dt
 
+    if (cell_wrt) then
+        open (99, FILE="./cell_prim.dat")
+    end if
+
     ! Time-stepping Loop =======================================================
     do
         if (t_step == t_step_stop) then

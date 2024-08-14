@@ -173,6 +173,7 @@ SIMULATION.update({
     't_step_stop': ParamType.INT,
     't_step_save': ParamType.INT,
     't_step_print': ParamType.INT,
+    'cell_wrt': ParamType.LOG,
     'time_stepper': ParamType.INT,
     'weno_eps': ParamType.REAL,
     'teno_CT': ParamType.REAL,

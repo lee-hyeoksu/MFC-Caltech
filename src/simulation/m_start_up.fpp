@@ -133,7 +133,7 @@ contains
 
         ! Namelist of the global parameters which may be specified by user
         namelist /user_inputs/ case_dir, run_time_info, m, n, p, dt, &
-            t_step_start, t_step_stop, t_step_save, t_step_print, &
+            t_step_start, t_step_stop, t_step_save, t_step_print, cell_wrt, &
             model_eqns, mpp_lim, time_stepper, weno_eps, weno_flat, &
             riemann_flat, rdma_mpi, cu_tensor, &
             teno_CT, mp_weno, weno_avg, &
@@ -1117,11 +1117,63 @@ contains
             call s_strang_splitting(t_step, time_avg)
         end if
         if (relax) call s_infinite_relaxation_k(q_cons_ts(1)%vf)
+        if (cell_wrt) call s_write_cell_data(t_step, q_cons_ts(1)%vf)
+
+        if (bubbles .and. q_cons_ts(1)%vf(alf_idx)%sf(j, k, l) > 0.1d0) then
+            call s_mpi_abort("Subgrid bubble volume fraction is > 0.1")
+        end if
+
         ! Time-stepping loop controls
         if ((mytime + dt) >= finaltime) dt = finaltime - mytime
         t_step = t_step + 1
 
     end subroutine s_perform_time_step
+
+    subroutine s_write_cell_data(t_step, qc_vf)
+        integer, intent(in) :: t_step
+        type(scalar_field), dimension(1:sys_size), intent(in) :: qc_vf
+        real(kind(0d0)) :: xloc, yloc, zloc
+        real(kind(0d0)) :: xt, yt, zt
+        real(kind(0d0)) :: xcc, ycc, zcc
+        integer :: i, j, k, l
+
+        call s_convert_conservative_to_primitive_variables(qc_vf, q_prim_vf)
+
+        xloc = 0.9d0 * (x_domain%end - x_domain%beg) + x_domain%beg
+        yloc = 0d0
+        zloc = 0d0
+
+        !$acc parallel loop collapse(3) gang vector default(present)
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    xt = (x_cb(j - 1) - xloc)*(x_cb(j) - xloc)
+                    yt = 0d0
+                    zt = 0d0
+                    if (n > 0) then
+                        yt = (y_cb(k - 1) - yloc)*(y_cb(k) - yloc)
+                        if (p > 0) then
+                            zt = (z_cb(l - 1) - zloc)*(z_cb(l) - zloc)
+                        end if
+                    end if
+
+                    if ((xt .le. 0d0) .and. (yt .le. 0d0) .and. (zt .le. 0d0)) then
+                        xcc = x_cc(j)
+                        ycc = 0d0
+                        zcc = 0d0
+                        if (n > 0) then
+                            ycc = y_cc(k)
+                            if (p > 0) then
+                                zcc = z_cc(l)
+                            end if
+                        end if
+    
+                        write(99,*) t_step, xcc, ycc, zcc, (q_prim_vf(i)%sf(j, k, l), i = 1, sys_size)
+                    end if
+                end do
+            end do
+        end do
+    end subroutine
 
     subroutine s_save_performance_metrics(t_step, time_avg, time_final, io_time_avg, io_time_final, proc_time, io_proc_time, file_exists, start, finish, nt)
 

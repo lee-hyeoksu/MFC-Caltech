@@ -187,6 +187,8 @@ module m_global_parameters
     logical :: file_per_process !< shared file or not when using parallel io
     integer :: precision !< Precision of output files
 
+    logical :: cell_wrt
+
     integer, allocatable, dimension(:) :: proc_coords !<
     !! Processor coordinates in MPI_CART_COMM
 
@@ -479,6 +481,7 @@ contains
         case_dir = '.'
         run_time_info = .false.
         t_step_old = dflt_int
+        cell_wrt = .true.
 
         ! Computational domain parameters
         m = dflt_int; n = 0; p = 0
