@@ -1118,11 +1118,6 @@ contains
         end if
         if (relax) call s_infinite_relaxation_k(q_cons_ts(1)%vf)
         if (cell_wrt) call s_write_cell_data(t_step, q_cons_ts(1)%vf)
-
-        if (bubbles .and. q_cons_ts(1)%vf(alf_idx)%sf(j, k, l) > 0.1d0) then
-            call s_mpi_abort("Subgrid bubble volume fraction is > 0.1")
-        end if
-
         ! Time-stepping loop controls
         if ((mytime + dt) >= finaltime) dt = finaltime - mytime
         t_step = t_step + 1
@@ -1141,7 +1136,7 @@ contains
 
         xloc = 0.9d0 * (x_domain%end - x_domain%beg) + x_domain%beg
         yloc = 0d0
-        zloc = 0d0
+        zloc = 0.75d0 * (z_domain%end - z_domain%beg) + z_domain%beg
 
         !$acc parallel loop collapse(3) gang vector default(present)
         do l = 0, p

@@ -104,8 +104,8 @@ contains
         !! @param q_cons_vf is the conservative variable
     subroutine s_comp_alpha_from_n(q_cons_vf)
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
-        real(kind(0d0)) :: nR3bar
-        integer(kind(0d0)) :: i, j, k, l
+        real(kind(0d0)) :: nR3bar, alphab
+        integer :: i, j, k, l
 
         !$acc parallel loop collapse(3) gang vector default(present)
         do l = 0, p
@@ -116,7 +116,13 @@ contains
                     do i = 1, nb
                         nR3bar = nR3bar + weight(i)*(q_cons_vf(rs(i))%sf(j, k, l))**3d0
                     end do
-                    q_cons_vf(alf_idx)%sf(j, k, l) = (4d0*pi*nR3bar)/(3d0*q_cons_vf(n_idx)%sf(j, k, l)**2d0)
+                    alphab = (4d0*pi*nR3bar)/(3d0*q_cons_vf(n_idx)%sf(j, k, l)**2d0)
+                    if (coupling) q_cons_vf(alf_idx)%sf(j, k, l) = alphab
+                    if (alphab > 0.1) then
+                        print *, proc_rank, j, k, l, alphab, nR3bar, q_cons_vf(n_idx)%sf(j, k, l)
+                        print *, (q_cons_vf(i)%sf(j, k, l), i = 1, sys_size)
+                        call s_mpi_abort("Subgrid bubble volume fraction is > 0.1")
+                    end if
                 end do
             end do
         end do
