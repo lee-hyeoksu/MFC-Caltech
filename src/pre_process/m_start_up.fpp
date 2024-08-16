@@ -764,6 +764,7 @@ contains
         !Quadrature weights and nodes for polydisperse simulations
         if (bubbles .and. nb > 1) then
             call s_simpson
+            print *, "R0:", (R0(i), i = 1,nb)
             print *, "weight:", (weight(i), i = 1, nb)
         end if
         !Initialize variables for non-polytropic (Preston) model
