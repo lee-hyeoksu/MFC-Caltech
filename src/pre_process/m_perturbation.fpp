@@ -191,7 +191,7 @@ contains
         do while (.true.)
 
             f0 = (Ca + 2d0/(Web*fR0))*(fR0/fR)**(3d0*gam_b) - 2d0/(Web*fR) + 1d0 - Ca - fP
-            f1 = -3d0*gam_b*(Ca + 2d0/(Web*fR0))*(fR0/fR)**(3d0*gam_b + 1d0) + 2d0/(Web*fR**2d0)
+            f1 = -3d0*gam_b*(Ca + 2d0/(Web*fR0))*(1d0/fR0)*(fR0/fR)**(3d0*gam_b + 1d0) + 2d0/(Web*fR**2d0)
 
             if (abs(f0) <= 1e-10) then
                 ! Converged
@@ -208,7 +208,6 @@ contains
                 fR < 0d0) then
 
                 print *, "Failed to compute equilibrium radius"
-
                 fR = fR0
                 exit
             end if
