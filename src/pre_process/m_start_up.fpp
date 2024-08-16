@@ -757,12 +757,14 @@ contains
     end subroutine s_read_parallel_ic_data_files
 
     subroutine s_initialize_modules
+        integer :: i
         ! Computation of parameters, allocation procedures, and/or any other tasks
         ! needed to properly setup the modules
         call s_initialize_global_parameters_module()
         !Quadrature weights and nodes for polydisperse simulations
         if (bubbles .and. nb > 1) then
             call s_simpson
+            print *, "weight:", (weight(i), i = 1, nb)
         end if
         !Initialize variables for non-polytropic (Preston) model
         if (bubbles .and. .not. polytropic) then
