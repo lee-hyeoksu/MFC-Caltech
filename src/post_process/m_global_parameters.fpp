@@ -239,6 +239,7 @@ module m_global_parameters
     real(kind(0d0)) :: poly_sigma
     real(kind(0d0)) :: sigR
     integer :: nmom
+    logical :: coupling !<
 
     !> @}
 
@@ -356,6 +357,7 @@ contains
         sigR = dflt_real
         sigma = dflt_real
         adv_n = .false.
+        coupling = .true.
 
     end subroutine s_assign_default_values_to_user_inputs
 

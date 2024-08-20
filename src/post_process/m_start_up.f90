@@ -74,7 +74,7 @@ contains
             parallel_io, rhoref, pref, bubbles, qbmm, sigR, &
             R0ref, nb, polytropic, thermal, Ca, Web, Re_inv, &
             polydisperse, poly_sigma, file_per_process, relax, &
-            relax_model, cf_wrt, sigma, adv_n, ib
+            relax_model, cf_wrt, sigma, adv_n, ib, coupling
 
         ! Inquiring the status of the post_process.inp file
         file_loc = 'post_process.inp'
@@ -170,6 +170,7 @@ contains
         integer, intent(inout) :: t_step
         character(LEN=name_len), intent(inout) :: varname
         real(kind(0d0)), intent(inout) :: pres, c, H
+        real(kind(0d0)) :: nR3bar
 
         integer :: i, j, k, l
 
@@ -620,6 +621,23 @@ contains
                        -offset_y%beg:n + offset_y%end, &
                        -offset_z%beg:p + offset_z%end)
                 write (varname, '(A)') 'n'
+                call s_write_variable_to_formatted_database_file(varname, t_step)
+                varname(:) = ' '
+            end if
+
+            if (.not. coupling) then
+                do l = -offset_z%beg, p + offset_z%end
+                    do k = -offset_y%beg, n + offset_y%end
+                        do j = -offset_x%beg, m + offset_x%end
+                            nR3bar = 0d0
+                            do i = 1, nb
+                                nR3bar = nR3bar + weight(i)*q_cons_vf(bub_idx%rs(i))%sf(j, k, l)**3d0
+                            end do
+                            q_sf(j, k, l) = (4d0*pi*nR3bar)/(3d0*q_cons_vf(n_idx)%sf(j, k, l)**2d0)
+                        end do
+                    end do
+                end do
+                write (varname, '(A)') 'alpha_b'
                 call s_write_variable_to_formatted_database_file(varname, t_step)
                 varname(:) = ' '
             end if
